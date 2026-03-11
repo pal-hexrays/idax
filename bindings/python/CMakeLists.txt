@@ -163,6 +163,8 @@ set(BINDING_SOURCES
     src/entry_bind.cpp
     src/fixup_bind.cpp
     src/lines_bind.cpp
+    src/event_bind.cpp
+    src/storage_bind.cpp
     src/diagnostics_bind.cpp
     src/lumina_bind.cpp
 )
