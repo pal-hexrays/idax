@@ -149,6 +149,8 @@ endif()
 set(BINDING_SOURCES
     src/module.cpp
     src/database_bind.cpp
+    src/address_bind.cpp
+    src/segment_bind.cpp
 )
 
 pybind11_add_module(_idax ${BINDING_SOURCES})
