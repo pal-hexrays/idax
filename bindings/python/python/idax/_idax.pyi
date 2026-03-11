@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, overload
+from typing import Callable
 
 BAD_ADDRESS: int
 
