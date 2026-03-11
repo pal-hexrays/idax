@@ -12,7 +12,7 @@ PYBIND11_MODULE(_idax, m) {
     init_database(m);
     init_address(m);
     init_segment(m);
-    // init_function(m);
+    init_function(m);
     // init_instruction(m);
     // init_name(m);
     // init_xref(m);
