@@ -156,6 +156,10 @@ set(BINDING_SOURCES
     src/data_bind.cpp
     src/name_bind.cpp
     src/xref_bind.cpp
+    src/comment_bind.cpp
+    src/search_bind.cpp
+    src/analysis_bind.cpp
+    src/entry_bind.cpp
 )
 
 pybind11_add_module(_idax ${BINDING_SOURCES})
