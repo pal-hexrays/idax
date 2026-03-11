@@ -152,6 +152,10 @@ set(BINDING_SOURCES
     src/address_bind.cpp
     src/segment_bind.cpp
     src/function_bind.cpp
+    src/instruction_bind.cpp
+    src/data_bind.cpp
+    src/name_bind.cpp
+    src/xref_bind.cpp
 )
 
 pybind11_add_module(_idax ${BINDING_SOURCES})

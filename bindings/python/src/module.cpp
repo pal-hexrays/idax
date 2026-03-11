@@ -13,11 +13,11 @@ PYBIND11_MODULE(_idax, m) {
     init_address(m);
     init_segment(m);
     init_function(m);
-    // init_instruction(m);
-    // init_name(m);
-    // init_xref(m);
+    init_instruction(m);
+    init_name(m);
+    init_xref(m);
     // init_comment(m);
-    // init_data(m);
+    init_data(m);
     // init_search(m);
     // init_analysis(m);
     // init_types(m);
