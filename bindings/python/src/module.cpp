@@ -9,7 +9,7 @@ PYBIND11_MODULE(_idax, m) {
     register_idax_exception(m);
 
     // Submodules — uncomment as each is implemented
-    // init_database(m);
+    init_database(m);
     // init_address(m);
     // init_segment(m);
     // init_function(m);
