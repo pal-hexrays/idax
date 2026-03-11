@@ -165,6 +165,7 @@ set(BINDING_SOURCES
     src/lines_bind.cpp
     src/event_bind.cpp
     src/storage_bind.cpp
+    src/decompiler_bind.cpp
     src/diagnostics_bind.cpp
     src/lumina_bind.cpp
 )
