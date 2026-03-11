@@ -22,11 +22,11 @@ PYBIND11_MODULE(_idax, m) {
     init_analysis(m);
     // init_types(m);
     init_entry(m);
-    // init_fixup(m);
+    init_fixup(m);
     // init_event(m);
     // init_storage(m);
     // init_decompiler(m);
-    // init_diagnostics(m);
-    // init_lumina(m);
-    // init_lines(m);
+    init_diagnostics(m);
+    init_lumina(m);
+    init_lines(m);
 }

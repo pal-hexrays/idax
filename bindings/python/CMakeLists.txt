@@ -160,6 +160,10 @@ set(BINDING_SOURCES
     src/search_bind.cpp
     src/analysis_bind.cpp
     src/entry_bind.cpp
+    src/fixup_bind.cpp
+    src/lines_bind.cpp
+    src/diagnostics_bind.cpp
+    src/lumina_bind.cpp
 )
 
 pybind11_add_module(_idax ${BINDING_SOURCES})
