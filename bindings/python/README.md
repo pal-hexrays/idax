@@ -143,3 +143,32 @@ The Python bindings use **snake\_case** throughout, matching Python conventions:
 Enum values also use snake\_case (e.g., `OpenMode.skip_analysis` instead of
 `"skipAnalysis"`). Reserved words are suffixed with an underscore
 (e.g., `register_`, `import_`, `null_`).
+
+## Known issues
+
+### Decompiler crash on extern/special segment functions
+
+Calling `decompiler.decompile()` on a function that lives in an extern or special
+segment (e.g. imported functions like `printf`, `__libc_start_main`) will cause a
+**SIGSEGV** that cannot be caught by Python's `try/except`. This is a crash inside
+the Hex-Rays SDK's `decompile_func()`, which does not gracefully handle these
+segment types. The Node.js bindings survive this because V8 installs its own
+structured exception handlers.
+
+**Workaround:** check the segment type before decompiling:
+
+```python
+seg = idax.segment.at(func.start)
+if seg and seg.type != idax.segment.Type.external:
+    dfunc = idax.decompiler.decompile(func.start)
+```
+
+A proper fix requires a guard in the idax C++ core (`src/decompiler.cpp`) to
+reject extern segment addresses before calling `decompile_func()`.
+
+### Process exit crash
+
+Python interpreter shutdown may segfault after `database.close()` due to
+conflicting cleanup order between pybind11 destructor and idalib's `atexit`
+handlers. Use `os._exit(0)` after `database.close()` in standalone scripts
+to avoid this.
