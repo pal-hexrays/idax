@@ -43,6 +43,37 @@ static ida::type::CallingConvention CallingConventionFromString(const std::strin
     return ida::type::CallingConvention::Unknown;
 }
 
+static const char* TypeKindToString(ida::type::TypeKind kind) {
+    switch (kind) {
+        case ida::type::TypeKind::Unknown:         return "unknown";
+        case ida::type::TypeKind::Void:            return "void";
+        case ida::type::TypeKind::Bool:            return "bool";
+        case ida::type::TypeKind::Character:       return "character";
+        case ida::type::TypeKind::SignedInteger:   return "signedInteger";
+        case ida::type::TypeKind::UnsignedInteger: return "unsignedInteger";
+        case ida::type::TypeKind::FloatingPoint:   return "floatingPoint";
+        case ida::type::TypeKind::Pointer:         return "pointer";
+        case ida::type::TypeKind::Array:           return "array";
+        case ida::type::TypeKind::Function:        return "function";
+        case ida::type::TypeKind::Struct:          return "struct";
+        case ida::type::TypeKind::Union:           return "union";
+        case ida::type::TypeKind::Enum:            return "enum";
+        case ida::type::TypeKind::Typedef:         return "typedef";
+    }
+    return "unknown";
+}
+
+static const char* EnumRadixToString(ida::type::EnumRadix radix) {
+    switch (radix) {
+        case ida::type::EnumRadix::Unknown:     return "unknown";
+        case ida::type::EnumRadix::Binary:      return "binary";
+        case ida::type::EnumRadix::Octal:       return "octal";
+        case ida::type::EnumRadix::Decimal:     return "decimal";
+        case ida::type::EnumRadix::Hexadecimal: return "hexadecimal";
+    }
+    return "unknown";
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // TypeInfoWrapper — Nan::ObjectWrap holding an ida::type::TypeInfo
 // ═══════════════════════════════════════════════════════════════════════
@@ -80,9 +111,16 @@ private:
     static NAN_METHOD(IsUnion);
     static NAN_METHOD(IsEnum);
     static NAN_METHOD(IsTypedef);
+    static NAN_METHOD(IsBool);
+    static NAN_METHOD(IsChar);
+    static NAN_METHOD(IsUnsignedChar);
+    static NAN_METHOD(IsSigned);
+    static NAN_METHOD(Kind);
+    static NAN_METHOD(Name);
 
     static NAN_METHOD(Size);
     static NAN_METHOD(ToString);
+    static NAN_METHOD(Declaration);
 
     static NAN_METHOD(PointeeType);
     static NAN_METHOD(ArrayElementType);
@@ -91,12 +129,15 @@ private:
 
     static NAN_METHOD(FunctionReturnType);
     static NAN_METHOD(FunctionArgumentTypes);
+    static NAN_METHOD(FunctionDetails);
     static NAN_METHOD(CallingConventionMethod);
     static NAN_METHOD(IsVariadicFunction);
     static NAN_METHOD(EnumMembers);
+    static NAN_METHOD(EnumDetails);
 
     static NAN_METHOD(MemberCount);
     static NAN_METHOD(Members);
+    static NAN_METHOD(UdtDetails);
     static NAN_METHOD(MemberByName);
     static NAN_METHOD(MemberByOffset);
     static NAN_METHOD(AddMember);
@@ -118,10 +159,113 @@ static v8::Local<v8::Object> MemberToObject(const ida::type::Member& m) {
         .setStr("name", m.name)
         .set("type", TypeInfoWrapper::NewInstance(m.type))
         .setSize("byteOffset", m.byte_offset)
+        .setSize("bitOffset", m.bit_offset)
         .setSize("bitSize", m.bit_size)
+        .setSize("storageByteWidth", m.storage_byte_width)
+        .setBool("isBaseclass", m.is_baseclass)
+        .setBool("isVftable", m.is_vftable)
+        .setBool("isGap", m.is_gap)
+        .setBool("isBitfield", m.is_bitfield)
         .setStr("comment", m.comment)
         .build();
     return obj;
+}
+
+static v8::Local<v8::Object> FunctionArgumentToObject(const ida::type::FunctionArgument& arg) {
+    return ObjectBuilder()
+        .setStr("name", arg.name)
+        .set("type", TypeInfoWrapper::NewInstance(arg.type))
+        .build();
+}
+
+static v8::Local<v8::Object> FunctionDetailsToObject(const ida::type::FunctionDetails& details) {
+    auto args = Nan::New<v8::Array>(static_cast<int>(details.arguments.size()));
+    for (size_t i = 0; i < details.arguments.size(); ++i)
+        Nan::Set(args, static_cast<uint32_t>(i), FunctionArgumentToObject(details.arguments[i]));
+
+    return ObjectBuilder()
+        .set("returnType", TypeInfoWrapper::NewInstance(details.return_type))
+        .set("arguments", args)
+        .setStr("callingConvention", CallingConventionToString(details.calling_convention))
+        .setBool("variadic", details.variadic)
+        .build();
+}
+
+static v8::Local<v8::Object> EnumMemberToObject(const ida::type::EnumMember& m) {
+    return ObjectBuilder()
+        .setStr("name", m.name)
+        .set("value", v8::BigInt::NewFromUnsigned(v8::Isolate::GetCurrent(), m.value))
+        .setStr("comment", m.comment)
+        .build();
+}
+
+static v8::Local<v8::Object> EnumDetailsToObject(const ida::type::EnumDetails& details) {
+    auto members = Nan::New<v8::Array>(static_cast<int>(details.members.size()));
+    for (size_t i = 0; i < details.members.size(); ++i)
+        Nan::Set(members, static_cast<uint32_t>(i), EnumMemberToObject(details.members[i]));
+
+    return ObjectBuilder()
+        .setSize("byteWidth", details.byte_width)
+        .setBool("signedValues", details.signed_values)
+        .setStr("radix", EnumRadixToString(details.radix))
+        .set("members", members)
+        .build();
+}
+
+static v8::Local<v8::Object> UdtDetailsToObject(const ida::type::UdtDetails& details) {
+    auto members = Nan::New<v8::Array>(static_cast<int>(details.members.size()));
+    for (size_t i = 0; i < details.members.size(); ++i)
+        Nan::Set(members, static_cast<uint32_t>(i), MemberToObject(details.members[i]));
+
+    return ObjectBuilder()
+        .setSize("totalSize", details.total_size)
+        .setBool("isUnion", details.is_union)
+        .setBool("isCppObject", details.is_cpp_object)
+        .setBool("isVftable", details.is_vftable)
+        .set("members", members)
+        .build();
+}
+
+static bool GetParseDeclarationsOptions(Nan::NAN_METHOD_ARGS_TYPE info,
+                                        int idx,
+                                        ida::type::ParseDeclarationsOptions& out) {
+    if (idx >= info.Length() || info[idx]->IsUndefined() || info[idx]->IsNull())
+        return true;
+    if (!info[idx]->IsObject()) {
+        Nan::ThrowTypeError("Expected parse declaration options object");
+        return false;
+    }
+
+    auto obj = info[idx].As<v8::Object>();
+    auto read_bool = [&](const char* key, bool& field) -> bool {
+        auto js_key = FromString(key);
+        if (!Nan::Has(obj, js_key).FromMaybe(false))
+            return true;
+        auto value = Nan::Get(obj, js_key).ToLocalChecked();
+        if (!value->IsBoolean()) {
+            Nan::ThrowTypeError("Expected boolean parse declaration option");
+            return false;
+        }
+        field = Nan::To<bool>(value).FromJust();
+        return true;
+    };
+
+    if (!read_bool("suppressWarnings", out.suppress_warnings)) return false;
+    if (!read_bool("relaxedNamespaces", out.relaxed_namespaces)) return false;
+    if (!read_bool("rawArgumentNames", out.raw_argument_names)) return false;
+    if (!read_bool("noMangle", out.no_mangle)) return false;
+
+    auto pack_key = FromString("packAlignment");
+    if (Nan::Has(obj, pack_key).FromMaybe(false)) {
+        auto value = Nan::Get(obj, pack_key).ToLocalChecked();
+        if (!value->IsNumber()) {
+            Nan::ThrowTypeError("Expected numeric packAlignment option");
+            return false;
+        }
+        out.pack_alignment = static_cast<std::size_t>(Nan::To<double>(value).FromJust());
+    }
+
+    return true;
 }
 
 // ── TypeInfoWrapper::Init — register the constructor + prototype ────────
@@ -142,9 +286,16 @@ NAN_MODULE_INIT(TypeInfoWrapper::Init) {
     Nan::SetPrototypeMethod(tpl, "isUnion",          IsUnion);
     Nan::SetPrototypeMethod(tpl, "isEnum",           IsEnum);
     Nan::SetPrototypeMethod(tpl, "isTypedef",        IsTypedef);
+    Nan::SetPrototypeMethod(tpl, "isBool",           IsBool);
+    Nan::SetPrototypeMethod(tpl, "isChar",           IsChar);
+    Nan::SetPrototypeMethod(tpl, "isUnsignedChar",   IsUnsignedChar);
+    Nan::SetPrototypeMethod(tpl, "isSigned",         IsSigned);
+    Nan::SetPrototypeMethod(tpl, "kind",             Kind);
+    Nan::SetPrototypeMethod(tpl, "name",             Name);
 
     Nan::SetPrototypeMethod(tpl, "size",             Size);
     Nan::SetPrototypeMethod(tpl, "toString",         ToString);
+    Nan::SetPrototypeMethod(tpl, "declaration",      Declaration);
 
     Nan::SetPrototypeMethod(tpl, "pointeeType",         PointeeType);
     Nan::SetPrototypeMethod(tpl, "arrayElementType",    ArrayElementType);
@@ -153,12 +304,15 @@ NAN_MODULE_INIT(TypeInfoWrapper::Init) {
 
     Nan::SetPrototypeMethod(tpl, "functionReturnType",    FunctionReturnType);
     Nan::SetPrototypeMethod(tpl, "functionArgumentTypes", FunctionArgumentTypes);
+    Nan::SetPrototypeMethod(tpl, "functionDetails",       FunctionDetails);
     Nan::SetPrototypeMethod(tpl, "callingConvention",     CallingConventionMethod);
     Nan::SetPrototypeMethod(tpl, "isVariadicFunction",    IsVariadicFunction);
     Nan::SetPrototypeMethod(tpl, "enumMembers",           EnumMembers);
+    Nan::SetPrototypeMethod(tpl, "enumDetails",           EnumDetails);
 
     Nan::SetPrototypeMethod(tpl, "memberCount",    MemberCount);
     Nan::SetPrototypeMethod(tpl, "members",         Members);
+    Nan::SetPrototypeMethod(tpl, "udtDetails",      UdtDetails);
     Nan::SetPrototypeMethod(tpl, "memberByName",    MemberByName);
     Nan::SetPrototypeMethod(tpl, "memberByOffset",  MemberByOffset);
     Nan::SetPrototypeMethod(tpl, "addMember",       AddMember);
@@ -273,6 +427,37 @@ NAN_METHOD(TypeInfoWrapper::IsTypedef) {
     info.GetReturnValue().Set(Nan::New(self->type_info_.is_typedef()));
 }
 
+NAN_METHOD(TypeInfoWrapper::IsBool) {
+    SELF();
+    info.GetReturnValue().Set(Nan::New(self->type_info_.is_bool()));
+}
+
+NAN_METHOD(TypeInfoWrapper::IsChar) {
+    SELF();
+    info.GetReturnValue().Set(Nan::New(self->type_info_.is_char()));
+}
+
+NAN_METHOD(TypeInfoWrapper::IsUnsignedChar) {
+    SELF();
+    info.GetReturnValue().Set(Nan::New(self->type_info_.is_unsigned_char()));
+}
+
+NAN_METHOD(TypeInfoWrapper::IsSigned) {
+    SELF();
+    info.GetReturnValue().Set(Nan::New(self->type_info_.is_signed()));
+}
+
+NAN_METHOD(TypeInfoWrapper::Kind) {
+    SELF();
+    info.GetReturnValue().Set(FromString(TypeKindToString(self->type_info_.kind())));
+}
+
+NAN_METHOD(TypeInfoWrapper::Name) {
+    SELF();
+    IDAX_UNWRAP(auto name, self->type_info_.name());
+    info.GetReturnValue().Set(FromString(name));
+}
+
 NAN_METHOD(TypeInfoWrapper::Size) {
     SELF();
     IDAX_UNWRAP(auto sz, self->type_info_.size());
@@ -282,6 +467,13 @@ NAN_METHOD(TypeInfoWrapper::Size) {
 NAN_METHOD(TypeInfoWrapper::ToString) {
     SELF();
     IDAX_UNWRAP(auto s, self->type_info_.to_string());
+    info.GetReturnValue().Set(FromString(s));
+}
+
+NAN_METHOD(TypeInfoWrapper::Declaration) {
+    SELF();
+    std::string name = GetOptionalString(info, 0);
+    IDAX_UNWRAP(auto s, self->type_info_.declaration(name));
     info.GetReturnValue().Set(FromString(s));
 }
 
@@ -327,6 +519,12 @@ NAN_METHOD(TypeInfoWrapper::FunctionArgumentTypes) {
     info.GetReturnValue().Set(arr);
 }
 
+NAN_METHOD(TypeInfoWrapper::FunctionDetails) {
+    SELF();
+    IDAX_UNWRAP(auto details, self->type_info_.function_details());
+    info.GetReturnValue().Set(FunctionDetailsToObject(details));
+}
+
 NAN_METHOD(TypeInfoWrapper::CallingConventionMethod) {
     SELF();
     IDAX_UNWRAP(auto cc, self->type_info_.calling_convention());
@@ -345,15 +543,15 @@ NAN_METHOD(TypeInfoWrapper::EnumMembers) {
 
     auto arr = Nan::New<v8::Array>(static_cast<int>(members.size()));
     for (size_t i = 0; i < members.size(); ++i) {
-        const auto& m = members[i];
-        auto obj = ObjectBuilder()
-            .setStr("name", m.name)
-            .set("value", v8::BigInt::NewFromUnsigned(v8::Isolate::GetCurrent(), m.value))
-            .setStr("comment", m.comment)
-            .build();
-        Nan::Set(arr, static_cast<uint32_t>(i), obj);
+        Nan::Set(arr, static_cast<uint32_t>(i), EnumMemberToObject(members[i]));
     }
     info.GetReturnValue().Set(arr);
+}
+
+NAN_METHOD(TypeInfoWrapper::EnumDetails) {
+    SELF();
+    IDAX_UNWRAP(auto details, self->type_info_.enum_details());
+    info.GetReturnValue().Set(EnumDetailsToObject(details));
 }
 
 NAN_METHOD(TypeInfoWrapper::MemberCount) {
@@ -371,6 +569,12 @@ NAN_METHOD(TypeInfoWrapper::Members) {
         Nan::Set(arr, static_cast<uint32_t>(i), MemberToObject(members[i]));
     }
     info.GetReturnValue().Set(arr);
+}
+
+NAN_METHOD(TypeInfoWrapper::UdtDetails) {
+    SELF();
+    IDAX_UNWRAP(auto details, self->type_info_.udt_details());
+    info.GetReturnValue().Set(UdtDetailsToObject(details));
 }
 
 NAN_METHOD(TypeInfoWrapper::MemberByName) {
@@ -694,6 +898,21 @@ NAN_METHOD(ApplyNamedType) {
     IDAX_CHECK_STATUS(ida::type::apply_named_type(addr, typeName));
 }
 
+NAN_METHOD(ParseDeclarations) {
+    // parseDeclarations(declarations, options?) -> { errorCount, ok }
+    std::string declarations;
+    if (!GetStringArg(info, 0, declarations)) return;
+
+    ida::type::ParseDeclarationsOptions options;
+    if (!GetParseDeclarationsOptions(info, 1, options)) return;
+
+    IDAX_UNWRAP(auto report, ida::type::parse_declarations(declarations, options));
+    info.GetReturnValue().Set(ObjectBuilder()
+        .setSize("errorCount", report.error_count)
+        .setBool("ok", report.ok())
+        .build());
+}
+
 } // anonymous namespace
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -741,6 +960,7 @@ void InitType(v8::Local<v8::Object> target) {
     SetMethod(ns, "importType",        ImportType);
     SetMethod(ns, "ensureNamedType",   EnsureNamedType);
     SetMethod(ns, "applyNamedType",    ApplyNamedType);
+    SetMethod(ns, "parseDeclarations", ParseDeclarations);
 }
 
 } // namespace idax_node

@@ -55,6 +55,17 @@ transfer, BSS gap filling, entry point registration with type application,
 fixup injection for relocatable binaries, save capability queries, and rebase
 handling.
 
+### `loader/sep_firmware_loader.cpp` — Apple SEP Firmware Loader Port
+
+Port of `/Users/int/Downloads/sep-binja-main` into an idax example loader.
+It detects raw 64-bit SEP firmware images via the `Built by legion2` markers,
+parses the SEP container header/app table, maps the boot/kernel/SEPOS/app/shared
+library modules into distinct IDA segments, loads embedded Mach-O segments with
+ARM64 permissions, registers discovered entry points plus exported symbols,
+annotates Mach-O headers/load commands, defines/applies SEP firmware structure
+types, and performs the Binary Ninja loader's init/GOT/tagged-pointer rewrite
+passes inside the IDA database.
+
 ### `procmod/advanced_procmod.cpp` — XRISC-32 Processor Module
 
 A full processor module for a hypothetical 32-bit RISC ISA with 16 instructions.
@@ -106,14 +117,25 @@ Port of the Python abyss Hex-Rays post-processing framework (Dennis Elser,
 
 The plugin demonstrates decompiler+UI event fanout (`on_func_printed`,
 `on_maturity_changed`, `on_curpos_changed`, `on_create_hint`,
-`on_refresh_pseudocode`, `on_popup_ready`, `on_rendering_info`,
+`on_refresh_pseudocode`, `on_populating_popup`, `on_rendering_info`,
 `on_screen_ea_changed`), pseudocode tagged-line rewrites (`ida::lines`),
 dynamic popup actions (`ida::ui::attach_dynamic_action`), and live
-disassembly-to-pseudocode highlight overlays.
+disassembly-to-pseudocode highlight overlays. It also demonstrates plugin-host
+Hex-Rays ownership with `ida::decompiler::initialize()` and
+`ScopedSession`.
 
 Experimental filters (`item_ctype`, `item_index`, `item_sync`, `lvars_alias`,
 `lvars_info`) start disabled by default and can be toggled from the pseudocode
 popup under the `abyss/` submenu.
+
+### `plugin/codedump_parity_probe_plugin.cpp` — ida-cdump Parity Probe
+
+Compact reference plugin for the audited ida-cdump migration gaps. It keeps an
+owned Hex-Rays `ScopedSession`, registers a pseudocode popup action, registers a
+Local Types `type_ref` action, shows a typed `FormBuilder` dialog, uses
+`WaitBox` progress, captures/restores local-variable settings while reapplying
+the current prototype declaration, and publishes the resulting report through
+the optional Qt clipboard helper with `ask_text` fallback.
 
 ### `plugin/driverbuddy_port_plugin.cpp` — DriverBuddy Port
 

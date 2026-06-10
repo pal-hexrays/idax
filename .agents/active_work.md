@@ -22,10 +22,8 @@
 
 - **1.3. Real-IDA Bindings CI Stabilization (Phase 20)**
   - 1.3.1. **Action:** Re-run `Bindings CI` after latest workflow/CMake fixes.
-- 1.3.2. **Completed this pass:** corrected Node example argv shape, enabled MSVC import-lib fallback even when `IDADIR` is set, moved Windows Rust build/run to PowerShell (MSVC-native linker path), added Windows `PATH` runtime propagation for Node/Rust examples, aliased Rust native static lib link target to `idax_rust`, exported `DEP_IDAX_*` metadata from `idax-sys`, added `idax` crate build-script re-linking, added explicit `#[link(name = "idax_rust", kind = "static")]` in `idax-sys` and `idax`, converted those `#[link]` blocks to non-empty sentinel extern declarations, then implemented a merged Windows shim strategy in `idax-sys/build.rs` (`idax_shim.lib` + `idax_rust.lib` -> `idax_shim_merged.lib` via `lib.exe`) and switched Windows native link output to `static=idax_shim_merged`.
-- 1.3.3. **Latest evidence:** build/link now passes on Windows Rust; runtime example invocations surface explicit `SdkFailure: Plugin policy controls are not implemented on Windows yet` after the prior shim plugin-policy change.
-- 1.3.4. **Remaining focus:** rerun `Bindings CI` with corrected Windows runtime mitigations (rollback unsupported shim plugin-policy init path; retain isolated empty `IDAUSR`) plus trace toggles/direct exec and fixture-IDB input (`tests/fixtures/simple_appcall_linux64.i64`) instead of raw PE loader path.
-  - 1.3.5. **Status:** In progress.
+  - 1.3.2. **Remaining focus:** rerun `Bindings CI` with corrected Windows runtime mitigations (rollback unsupported shim plugin-policy init path; retain isolated empty `IDAUSR`) plus trace toggles/direct exec and fixture-IDB input (`tests/fixtures/simple_appcall_linux64.i64`) instead of raw PE loader path.
+  - 1.3.3. **Status:** In progress.
 
 ---
 
@@ -75,3 +73,12 @@
   - 5.1.6. **Status:** Pending triage.
 
 ---
+
+### 6. ida-cdump Parity Closure (Phase 22)
+
+- **6.1. Host Evidence Queue**
+  - 6.1.1. **Action:** Collect interactive host evidence for the remaining P22 UI/runtime gates documented in `docs/codedump_parity_tasks.md`.
+  - 6.1.2. **Modal typed-form evidence:** Run `IDAX_RUN_MODAL_FORMS=1` in an interactive IDA UI host, accept the codedump-shaped dialog, and verify the captured log with `scripts/check_codedump_parity_evidence_log.sh <log> modal`.
+  - 6.1.3. **Clipboard evidence:** Run `IDAX_RUN_QT_CLIPBOARD=1` in an IDA UI host with either an IDA-compatible Qt clipboard backend or a working external clipboard command, then verify with `scripts/check_codedump_parity_evidence_log.sh <log> qt-clipboard`.
+  - 6.1.4. **Blocker:** Requires an interactive IDA UI host; Qt clipboard mode also requires either a namespaced `QT_NAMESPACE=QT` Qt package or usable host clipboard command access.
+  - 6.1.5. **Status:** In progress / host-gated.

@@ -597,6 +597,11 @@
   - 13.3.2. **Decision:** Expand appcall-smoke with hold-mode + default launches across path/cwd permutations
     - Rejected: Default-args-only (weaker diagnosis)
     - Rejected: Attach-only first (requires additional orchestration)
+
+- **13.4. Loader Bridge Export Semantics**
+  - 13.4.1. **Decision:** Make `src/loader.cpp` the single SDK-facing export point for `idax` loader modules by emitting `idaman loader_t ida_module_data LDSC` and trampoline callbacks that forward into the `IDAX_LOADER(...)`-registered C++ `ida::loader::Loader` instance.
+    - Rejected: Keep `IDAX_LOADER(...)` as `idax_loader_bridge_init`-only (builds but loader is invisible to IDA)
+    - Rejected: Require every example/user loader to hand-write a separate raw-SDK `LDSC` block (defeats the wrapper goal)
   - 13.3.3. **Decision:** Add spawn+attach fallback to appcall smoke for better root-cause classification
     - Rejected: Launch-only probes (ambiguous classification)
     - Rejected: Standalone attach utility (target sprawl)
@@ -1004,3 +1009,8 @@
 - **19.22. Decision D-RUST-WINDOWS-EXAMPLE-FIXTURE-IDB-INPUT**: Use stable fixture IDB as Windows Rust runtime input in CI
   - **19.22.1. Decision:** In Windows Rust runtime workflow step, run examples against `tests/fixtures/simple_appcall_linux64.i64` (resolved absolute path) instead of a copied raw system binary.
   - **19.22.2. Rationale:** Raw PE open path was exiting during `database::open` with opaque code 1 before wrapper-level errors; fixture IDB input removes loader-path variance and validates core wrapper/runtime behavior deterministically.
+
+- **19.23. Decision D-RICH-TYPE-METADATA-OPAQUE-SURFACE**: Expose trida-required type layout metadata through opaque idax APIs
+  - **19.23.1. Decision:** Add first-class opaque `ida::type` metadata structs and methods for type kind/name/declaration, function details, enum details, UDT details, and rich member layout flags instead of allowing plugin ports to include `typeinf.hpp` and inspect `tinfo_t`, `udt_type_data_t`, or related SDK structs.
+  - **19.23.2. Rationale:** ida-trida needs bit offsets, bitfield backing width, baseclass/vftable/gap flags, named function arguments, enum width/radix, and UDT total-size/object metadata to generate faithful Frida helpers. Keeping this data in idax preserves the fully opaque public API rule while making real generator ports practical.
+  - **19.23.3. Binding posture:** Node and Rust expose the same concepts structurally, but structural Node tests must not construct `TypeInfo` factory objects in an uninitialized Node-only process; runtime TypeInfo behavior remains covered by initialized C++/integration paths.

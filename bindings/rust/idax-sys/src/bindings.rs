@@ -249,6 +249,9 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn idax_database_idb_path(out: *mut *mut ::std::os::raw::c_char) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn idax_database_file_type_name(
         out: *mut *mut ::std::os::raw::c_char,
     ) -> ::std::os::raw::c_int;
@@ -292,6 +295,24 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn idax_database_address_span(out: *mut u64) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_path_basename(
+        path: *const ::std::os::raw::c_char,
+        out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_path_dirname(
+        path: *const ::std::os::raw::c_char,
+        out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_path_is_directory(
+        path: *const ::std::os::raw::c_char,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     pub fn idax_address_is_mapped(ea: u64) -> ::std::os::raw::c_int;
@@ -811,6 +832,18 @@ unsafe extern "C" {
         name: *const ::std::os::raw::c_char,
         frame_offset: i32,
         type_: *mut ::std::os::raw::c_void,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_function_set_prototype(
+        function_ea: u64,
+        type_: *mut ::std::os::raw::c_void,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_function_apply_decl(
+        function_ea: u64,
+        c_decl: *const ::std::os::raw::c_char,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
@@ -1875,11 +1908,17 @@ pub struct IdaxTypeMember {
     pub type_: IdaxTypeHandle,
     pub byte_offset: usize,
     pub bit_size: usize,
+    pub bit_offset: usize,
+    pub storage_byte_width: usize,
+    pub is_baseclass: ::std::os::raw::c_int,
+    pub is_vftable: ::std::os::raw::c_int,
+    pub is_gap: ::std::os::raw::c_int,
+    pub is_bitfield: ::std::os::raw::c_int,
     pub comment: *mut ::std::os::raw::c_char,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of IdaxTypeMember"][::std::mem::size_of::<IdaxTypeMember>() - 40usize];
+    ["Size of IdaxTypeMember"][::std::mem::size_of::<IdaxTypeMember>() - 72usize];
     ["Alignment of IdaxTypeMember"][::std::mem::align_of::<IdaxTypeMember>() - 8usize];
     ["Offset of field: IdaxTypeMember::name"]
         [::std::mem::offset_of!(IdaxTypeMember, name) - 0usize];
@@ -1889,10 +1928,151 @@ const _: () = {
         [::std::mem::offset_of!(IdaxTypeMember, byte_offset) - 16usize];
     ["Offset of field: IdaxTypeMember::bit_size"]
         [::std::mem::offset_of!(IdaxTypeMember, bit_size) - 24usize];
+    ["Offset of field: IdaxTypeMember::bit_offset"]
+        [::std::mem::offset_of!(IdaxTypeMember, bit_offset) - 32usize];
+    ["Offset of field: IdaxTypeMember::storage_byte_width"]
+        [::std::mem::offset_of!(IdaxTypeMember, storage_byte_width) - 40usize];
+    ["Offset of field: IdaxTypeMember::is_baseclass"]
+        [::std::mem::offset_of!(IdaxTypeMember, is_baseclass) - 48usize];
+    ["Offset of field: IdaxTypeMember::is_vftable"]
+        [::std::mem::offset_of!(IdaxTypeMember, is_vftable) - 52usize];
+    ["Offset of field: IdaxTypeMember::is_gap"]
+        [::std::mem::offset_of!(IdaxTypeMember, is_gap) - 56usize];
+    ["Offset of field: IdaxTypeMember::is_bitfield"]
+        [::std::mem::offset_of!(IdaxTypeMember, is_bitfield) - 60usize];
     ["Offset of field: IdaxTypeMember::comment"]
-        [::std::mem::offset_of!(IdaxTypeMember, comment) - 32usize];
+        [::std::mem::offset_of!(IdaxTypeMember, comment) - 64usize];
 };
 impl Default for IdaxTypeMember {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IdaxTypeFunctionArgument {
+    pub name: *mut ::std::os::raw::c_char,
+    pub type_: IdaxTypeHandle,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxTypeFunctionArgument"]
+        [::std::mem::size_of::<IdaxTypeFunctionArgument>() - 16usize];
+    ["Alignment of IdaxTypeFunctionArgument"]
+        [::std::mem::align_of::<IdaxTypeFunctionArgument>() - 8usize];
+    ["Offset of field: IdaxTypeFunctionArgument::name"]
+        [::std::mem::offset_of!(IdaxTypeFunctionArgument, name) - 0usize];
+    ["Offset of field: IdaxTypeFunctionArgument::type_"]
+        [::std::mem::offset_of!(IdaxTypeFunctionArgument, type_) - 8usize];
+};
+impl Default for IdaxTypeFunctionArgument {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IdaxTypeFunctionDetails {
+    pub return_type: IdaxTypeHandle,
+    pub arguments: *mut IdaxTypeFunctionArgument,
+    pub argument_count: usize,
+    pub calling_convention: ::std::os::raw::c_int,
+    pub variadic: ::std::os::raw::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxTypeFunctionDetails"][::std::mem::size_of::<IdaxTypeFunctionDetails>() - 32usize];
+    ["Alignment of IdaxTypeFunctionDetails"]
+        [::std::mem::align_of::<IdaxTypeFunctionDetails>() - 8usize];
+    ["Offset of field: IdaxTypeFunctionDetails::return_type"]
+        [::std::mem::offset_of!(IdaxTypeFunctionDetails, return_type) - 0usize];
+    ["Offset of field: IdaxTypeFunctionDetails::arguments"]
+        [::std::mem::offset_of!(IdaxTypeFunctionDetails, arguments) - 8usize];
+    ["Offset of field: IdaxTypeFunctionDetails::argument_count"]
+        [::std::mem::offset_of!(IdaxTypeFunctionDetails, argument_count) - 16usize];
+    ["Offset of field: IdaxTypeFunctionDetails::calling_convention"]
+        [::std::mem::offset_of!(IdaxTypeFunctionDetails, calling_convention) - 24usize];
+    ["Offset of field: IdaxTypeFunctionDetails::variadic"]
+        [::std::mem::offset_of!(IdaxTypeFunctionDetails, variadic) - 28usize];
+};
+impl Default for IdaxTypeFunctionDetails {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IdaxTypeEnumDetails {
+    pub byte_width: usize,
+    pub signed_values: ::std::os::raw::c_int,
+    pub radix: ::std::os::raw::c_int,
+    pub members: *mut IdaxTypeEnumMember,
+    pub member_count: usize,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxTypeEnumDetails"][::std::mem::size_of::<IdaxTypeEnumDetails>() - 32usize];
+    ["Alignment of IdaxTypeEnumDetails"][::std::mem::align_of::<IdaxTypeEnumDetails>() - 8usize];
+    ["Offset of field: IdaxTypeEnumDetails::byte_width"]
+        [::std::mem::offset_of!(IdaxTypeEnumDetails, byte_width) - 0usize];
+    ["Offset of field: IdaxTypeEnumDetails::signed_values"]
+        [::std::mem::offset_of!(IdaxTypeEnumDetails, signed_values) - 8usize];
+    ["Offset of field: IdaxTypeEnumDetails::radix"]
+        [::std::mem::offset_of!(IdaxTypeEnumDetails, radix) - 12usize];
+    ["Offset of field: IdaxTypeEnumDetails::members"]
+        [::std::mem::offset_of!(IdaxTypeEnumDetails, members) - 16usize];
+    ["Offset of field: IdaxTypeEnumDetails::member_count"]
+        [::std::mem::offset_of!(IdaxTypeEnumDetails, member_count) - 24usize];
+};
+impl Default for IdaxTypeEnumDetails {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IdaxTypeUdtDetails {
+    pub total_size: usize,
+    pub is_union: ::std::os::raw::c_int,
+    pub is_cpp_object: ::std::os::raw::c_int,
+    pub is_vftable: ::std::os::raw::c_int,
+    pub members: *mut IdaxTypeMember,
+    pub member_count: usize,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxTypeUdtDetails"][::std::mem::size_of::<IdaxTypeUdtDetails>() - 40usize];
+    ["Alignment of IdaxTypeUdtDetails"][::std::mem::align_of::<IdaxTypeUdtDetails>() - 8usize];
+    ["Offset of field: IdaxTypeUdtDetails::total_size"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, total_size) - 0usize];
+    ["Offset of field: IdaxTypeUdtDetails::is_union"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, is_union) - 8usize];
+    ["Offset of field: IdaxTypeUdtDetails::is_cpp_object"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, is_cpp_object) - 12usize];
+    ["Offset of field: IdaxTypeUdtDetails::is_vftable"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, is_vftable) - 16usize];
+    ["Offset of field: IdaxTypeUdtDetails::members"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, members) - 24usize];
+    ["Offset of field: IdaxTypeUdtDetails::member_count"]
+        [::std::mem::offset_of!(IdaxTypeUdtDetails, member_count) - 32usize];
+};
+impl Default for IdaxTypeUdtDetails {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -2002,11 +2182,42 @@ unsafe extern "C" {
     pub fn idax_type_is_typedef(ti: IdaxTypeHandle) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn idax_type_is_bool(ti: IdaxTypeHandle) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_is_char(ti: IdaxTypeHandle) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_is_unsigned_char(ti: IdaxTypeHandle) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_is_signed(ti: IdaxTypeHandle) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_kind(
+        ti: IdaxTypeHandle,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn idax_type_size(ti: IdaxTypeHandle, out: *mut usize) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     pub fn idax_type_to_string(
         ti: IdaxTypeHandle,
+        out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_name(
+        ti: IdaxTypeHandle,
+        out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_declaration(
+        ti: IdaxTypeHandle,
+        declarator_name: *const ::std::os::raw::c_char,
         out: *mut *mut ::std::os::raw::c_char,
     ) -> ::std::os::raw::c_int;
 }
@@ -2045,6 +2256,12 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn idax_type_function_details(
+        ti: IdaxTypeHandle,
+        out: *mut *mut IdaxTypeFunctionDetails,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn idax_type_calling_convention(
         ti: IdaxTypeHandle,
         out: *mut ::std::os::raw::c_int,
@@ -2061,6 +2278,12 @@ unsafe extern "C" {
         ti: IdaxTypeHandle,
         out: *mut *mut IdaxTypeEnumMember,
         count: *mut usize,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_enum_details(
+        ti: IdaxTypeHandle,
+        out: *mut *mut IdaxTypeEnumDetails,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
@@ -2105,6 +2328,12 @@ unsafe extern "C" {
         ti: IdaxTypeHandle,
         out: *mut *mut IdaxTypeMember,
         count: *mut usize,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_type_udt_details(
+        ti: IdaxTypeHandle,
+        out: *mut *mut IdaxTypeUdtDetails,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
@@ -2163,6 +2392,17 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn idax_type_parse_declarations(
+        declarations: *const ::std::os::raw::c_char,
+        suppress_warnings: ::std::os::raw::c_int,
+        relaxed_namespaces: ::std::os::raw::c_int,
+        raw_argument_names: ::std::os::raw::c_int,
+        no_mangle: ::std::os::raw::c_int,
+        pack_alignment: usize,
+        error_count: *mut usize,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn idax_type_handle_array_free(handles: *mut IdaxTypeHandle, count: usize);
 }
 unsafe extern "C" {
@@ -2173,6 +2413,15 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn idax_type_members_free(members: *mut IdaxTypeMember, count: usize);
+}
+unsafe extern "C" {
+    pub fn idax_type_function_details_free(details: *mut IdaxTypeFunctionDetails);
+}
+unsafe extern "C" {
+    pub fn idax_type_enum_details_free(details: *mut IdaxTypeEnumDetails);
+}
+unsafe extern "C" {
+    pub fn idax_type_udt_details_free(details: *mut IdaxTypeUdtDetails);
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2527,10 +2776,12 @@ pub struct IdaxPluginActionContext {
     pub widget_handle: *mut ::std::os::raw::c_void,
     pub focused_widget_handle: *mut ::std::os::raw::c_void,
     pub decompiler_view_handle: *mut ::std::os::raw::c_void,
+    pub type_ref_name: *const ::std::os::raw::c_char,
+    pub type_ref_type: IdaxTypeHandle,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of IdaxPluginActionContext"][::std::mem::size_of::<IdaxPluginActionContext>() - 80usize];
+    ["Size of IdaxPluginActionContext"][::std::mem::size_of::<IdaxPluginActionContext>() - 96usize];
     ["Alignment of IdaxPluginActionContext"]
         [::std::mem::align_of::<IdaxPluginActionContext>() - 8usize];
     ["Offset of field: IdaxPluginActionContext::action_id"]
@@ -2555,6 +2806,10 @@ const _: () = {
         [::std::mem::offset_of!(IdaxPluginActionContext, focused_widget_handle) - 64usize];
     ["Offset of field: IdaxPluginActionContext::decompiler_view_handle"]
         [::std::mem::offset_of!(IdaxPluginActionContext, decompiler_view_handle) - 72usize];
+    ["Offset of field: IdaxPluginActionContext::type_ref_name"]
+        [::std::mem::offset_of!(IdaxPluginActionContext, type_ref_name) - 80usize];
+    ["Offset of field: IdaxPluginActionContext::type_ref_type"]
+        [::std::mem::offset_of!(IdaxPluginActionContext, type_ref_type) - 88usize];
 };
 impl Default for IdaxPluginActionContext {
     fn default() -> Self {
@@ -3551,6 +3806,10 @@ unsafe extern "C" {
 }
 #[doc = " Opaque handle to a decompiled function. Must be freed with idax_decompiled_free()."]
 pub type IdaxDecompiledHandle = *mut ::std::os::raw::c_void;
+#[doc = " Opaque handle to lvar user settings. Must be freed with idax_lvar_snapshot_free()."]
+pub type IdaxLvarSnapshotHandle = *mut ::std::os::raw::c_void;
+#[doc = " Opaque handle to an owned Hex-Rays session. Must be freed with idax_decompiler_session_free()."]
+pub type IdaxDecompilerSessionHandle = *mut ::std::os::raw::c_void;
 pub type IdaxDecompilerToken = u64;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -3653,6 +3912,38 @@ impl Default for IdaxDecompilerHintRequestEvent {
         }
     }
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IdaxDecompilerPopulatingPopupEvent {
+    pub function_address: u64,
+    pub widget_handle: *mut ::std::os::raw::c_void,
+    pub popup_handle: *mut ::std::os::raw::c_void,
+    pub view_handle: *mut ::std::os::raw::c_void,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxDecompilerPopulatingPopupEvent"]
+        [::std::mem::size_of::<IdaxDecompilerPopulatingPopupEvent>() - 32usize];
+    ["Alignment of IdaxDecompilerPopulatingPopupEvent"]
+        [::std::mem::align_of::<IdaxDecompilerPopulatingPopupEvent>() - 8usize];
+    ["Offset of field: IdaxDecompilerPopulatingPopupEvent::function_address"]
+        [::std::mem::offset_of!(IdaxDecompilerPopulatingPopupEvent, function_address) - 0usize];
+    ["Offset of field: IdaxDecompilerPopulatingPopupEvent::widget_handle"]
+        [::std::mem::offset_of!(IdaxDecompilerPopulatingPopupEvent, widget_handle) - 8usize];
+    ["Offset of field: IdaxDecompilerPopulatingPopupEvent::popup_handle"]
+        [::std::mem::offset_of!(IdaxDecompilerPopulatingPopupEvent, popup_handle) - 16usize];
+    ["Offset of field: IdaxDecompilerPopulatingPopupEvent::view_handle"]
+        [::std::mem::offset_of!(IdaxDecompilerPopulatingPopupEvent, view_handle) - 24usize];
+};
+impl Default for IdaxDecompilerPopulatingPopupEvent {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 pub type IdaxDecompilerMaturityChangedCallback = ::std::option::Option<
     unsafe extern "C" fn(
         context: *mut ::std::os::raw::c_void,
@@ -3679,6 +3970,12 @@ pub type IdaxDecompilerCreateHintCallback = ::std::option::Option<
         out_lines: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int,
 >;
+pub type IdaxDecompilerPopulatingPopupCallback = ::std::option::Option<
+    unsafe extern "C" fn(
+        context: *mut ::std::os::raw::c_void,
+        event: *const IdaxDecompilerPopulatingPopupEvent,
+    ),
+>;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct IdaxDecompilerItemAtPosition {
@@ -3703,38 +4000,86 @@ const _: () = {
         [::std::mem::offset_of!(IdaxDecompilerItemAtPosition, is_expression) - 20usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct IdaxDecompilerExpressionInfo {
     pub type_: ::std::os::raw::c_int,
     pub address: u64,
+    pub variable_index: ::std::os::raw::c_int,
+    pub helper_name: *const ::std::os::raw::c_char,
+    pub type_declaration: *const ::std::os::raw::c_char,
+    pub has_parent: ::std::os::raw::c_int,
+    pub parent_type: ::std::os::raw::c_int,
+    pub parent_address: u64,
+    pub parent_is_expression: ::std::os::raw::c_int,
+    pub parent_depth: usize,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of IdaxDecompilerExpressionInfo"]
-        [::std::mem::size_of::<IdaxDecompilerExpressionInfo>() - 16usize];
+        [::std::mem::size_of::<IdaxDecompilerExpressionInfo>() - 72usize];
     ["Alignment of IdaxDecompilerExpressionInfo"]
         [::std::mem::align_of::<IdaxDecompilerExpressionInfo>() - 8usize];
     ["Offset of field: IdaxDecompilerExpressionInfo::type_"]
         [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, type_) - 0usize];
     ["Offset of field: IdaxDecompilerExpressionInfo::address"]
         [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, address) - 8usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::variable_index"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, variable_index) - 16usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::helper_name"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, helper_name) - 24usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::type_declaration"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, type_declaration) - 32usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::has_parent"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, has_parent) - 40usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::parent_type"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, parent_type) - 44usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::parent_address"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, parent_address) - 48usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::parent_is_expression"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, parent_is_expression) - 56usize];
+    ["Offset of field: IdaxDecompilerExpressionInfo::parent_depth"]
+        [::std::mem::offset_of!(IdaxDecompilerExpressionInfo, parent_depth) - 64usize];
 };
+impl Default for IdaxDecompilerExpressionInfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct IdaxDecompilerStatementInfo {
     pub type_: ::std::os::raw::c_int,
     pub address: u64,
+    pub has_parent: ::std::os::raw::c_int,
+    pub parent_type: ::std::os::raw::c_int,
+    pub parent_address: u64,
+    pub parent_is_expression: ::std::os::raw::c_int,
+    pub parent_depth: usize,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of IdaxDecompilerStatementInfo"]
-        [::std::mem::size_of::<IdaxDecompilerStatementInfo>() - 16usize];
+        [::std::mem::size_of::<IdaxDecompilerStatementInfo>() - 48usize];
     ["Alignment of IdaxDecompilerStatementInfo"]
         [::std::mem::align_of::<IdaxDecompilerStatementInfo>() - 8usize];
     ["Offset of field: IdaxDecompilerStatementInfo::type_"]
         [::std::mem::offset_of!(IdaxDecompilerStatementInfo, type_) - 0usize];
     ["Offset of field: IdaxDecompilerStatementInfo::address"]
         [::std::mem::offset_of!(IdaxDecompilerStatementInfo, address) - 8usize];
+    ["Offset of field: IdaxDecompilerStatementInfo::has_parent"]
+        [::std::mem::offset_of!(IdaxDecompilerStatementInfo, has_parent) - 16usize];
+    ["Offset of field: IdaxDecompilerStatementInfo::parent_type"]
+        [::std::mem::offset_of!(IdaxDecompilerStatementInfo, parent_type) - 20usize];
+    ["Offset of field: IdaxDecompilerStatementInfo::parent_address"]
+        [::std::mem::offset_of!(IdaxDecompilerStatementInfo, parent_address) - 24usize];
+    ["Offset of field: IdaxDecompilerStatementInfo::parent_is_expression"]
+        [::std::mem::offset_of!(IdaxDecompilerStatementInfo, parent_is_expression) - 32usize];
+    ["Offset of field: IdaxDecompilerStatementInfo::parent_depth"]
+        [::std::mem::offset_of!(IdaxDecompilerStatementInfo, parent_depth) - 40usize];
 };
 pub type IdaxDecompilerExpressionVisitor = ::std::option::Option<
     unsafe extern "C" fn(
@@ -3750,6 +4095,25 @@ pub type IdaxDecompilerStatementVisitor = ::std::option::Option<
 >;
 unsafe extern "C" {
     pub fn idax_decompiler_available(out: *mut ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiler_initialize(
+        out: *mut IdaxDecompilerSessionHandle,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiler_session_valid(
+        handle: IdaxDecompilerSessionHandle,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiler_session_close(
+        handle: IdaxDecompilerSessionHandle,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiler_session_free(handle: IdaxDecompilerSessionHandle);
 }
 unsafe extern "C" {
     pub fn idax_decompiler_decompile(
@@ -3791,6 +4155,13 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn idax_decompiler_on_create_hint(
         callback: IdaxDecompilerCreateHintCallback,
+        context: *mut ::std::os::raw::c_void,
+        token_out: *mut IdaxDecompilerToken,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiler_on_populating_popup(
+        callback: IdaxDecompilerPopulatingPopupCallback,
         context: *mut ::std::os::raw::c_void,
         token_out: *mut IdaxDecompilerToken,
     ) -> ::std::os::raw::c_int;
@@ -3863,10 +4234,11 @@ pub struct IdaxLocalVariable {
     #[doc = "< 0=unknown, 1=register, 2=stack"]
     pub storage: ::std::os::raw::c_int,
     pub comment: *mut ::std::os::raw::c_char,
+    pub index: usize,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of IdaxLocalVariable"][::std::mem::size_of::<IdaxLocalVariable>() - 40usize];
+    ["Size of IdaxLocalVariable"][::std::mem::size_of::<IdaxLocalVariable>() - 48usize];
     ["Alignment of IdaxLocalVariable"][::std::mem::align_of::<IdaxLocalVariable>() - 8usize];
     ["Offset of field: IdaxLocalVariable::name"]
         [::std::mem::offset_of!(IdaxLocalVariable, name) - 0usize];
@@ -3882,6 +4254,8 @@ const _: () = {
         [::std::mem::offset_of!(IdaxLocalVariable, storage) - 28usize];
     ["Offset of field: IdaxLocalVariable::comment"]
         [::std::mem::offset_of!(IdaxLocalVariable, comment) - 32usize];
+    ["Offset of field: IdaxLocalVariable::index"]
+        [::std::mem::offset_of!(IdaxLocalVariable, index) - 40usize];
 };
 impl Default for IdaxLocalVariable {
     fn default() -> Self {
@@ -3912,10 +4286,58 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn idax_decompiled_variable(
+        handle: IdaxDecompiledHandle,
+        index: usize,
+        out: *mut IdaxLocalVariable,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn idax_decompiled_rename_variable(
         handle: IdaxDecompiledHandle,
         old_name: *const ::std::os::raw::c_char,
         new_name: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiled_capture_user_lvar_settings(
+        handle: IdaxDecompiledHandle,
+        out: *mut IdaxLvarSnapshotHandle,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiled_restore_user_lvar_settings(
+        handle: IdaxDecompiledHandle,
+        snapshot: IdaxLvarSnapshotHandle,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiled_set_variable_comment_by_name(
+        handle: IdaxDecompiledHandle,
+        variable_name: *const ::std::os::raw::c_char,
+        comment: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_decompiled_set_variable_comment_by_index(
+        handle: IdaxDecompiledHandle,
+        variable_index: usize,
+        comment: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_lvar_snapshot_free(snapshot: IdaxLvarSnapshotHandle);
+}
+unsafe extern "C" {
+    pub fn idax_lvar_snapshot_empty(
+        snapshot: IdaxLvarSnapshotHandle,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_lvar_snapshot_saved_variable_count(
+        snapshot: IdaxLvarSnapshotHandle,
+        out: *mut usize,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
@@ -4069,6 +4491,48 @@ pub struct IdaxMicrocodeOperand {
     pub signed_immediate: i64,
     pub byte_width: ::std::os::raw::c_int,
     pub mark_user_defined_type: ::std::os::raw::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of IdaxMicrocodeOperand"][::std::mem::size_of::<IdaxMicrocodeOperand>() - 96usize];
+    ["Alignment of IdaxMicrocodeOperand"][::std::mem::align_of::<IdaxMicrocodeOperand>() - 8usize];
+    ["Offset of field: IdaxMicrocodeOperand::kind"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, kind) - 0usize];
+    ["Offset of field: IdaxMicrocodeOperand::register_id"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, register_id) - 4usize];
+    ["Offset of field: IdaxMicrocodeOperand::local_variable_index"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, local_variable_index) - 8usize];
+    ["Offset of field: IdaxMicrocodeOperand::local_variable_offset"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, local_variable_offset) - 16usize];
+    ["Offset of field: IdaxMicrocodeOperand::second_register_id"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, second_register_id) - 24usize];
+    ["Offset of field: IdaxMicrocodeOperand::global_address"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, global_address) - 32usize];
+    ["Offset of field: IdaxMicrocodeOperand::stack_offset"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, stack_offset) - 40usize];
+    ["Offset of field: IdaxMicrocodeOperand::helper_name"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, helper_name) - 48usize];
+    ["Offset of field: IdaxMicrocodeOperand::block_index"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, block_index) - 56usize];
+    ["Offset of field: IdaxMicrocodeOperand::nested_instruction"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, nested_instruction) - 64usize];
+    ["Offset of field: IdaxMicrocodeOperand::unsigned_immediate"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, unsigned_immediate) - 72usize];
+    ["Offset of field: IdaxMicrocodeOperand::signed_immediate"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, signed_immediate) - 80usize];
+    ["Offset of field: IdaxMicrocodeOperand::byte_width"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, byte_width) - 88usize];
+    ["Offset of field: IdaxMicrocodeOperand::mark_user_defined_type"]
+        [::std::mem::offset_of!(IdaxMicrocodeOperand, mark_user_defined_type) - 92usize];
+};
+impl Default for IdaxMicrocodeOperand {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -4973,11 +5437,116 @@ unsafe extern "C" {
         context: *mut ::std::os::raw::c_void,
     ) -> ::std::os::raw::c_int;
 }
+pub type IdaxUIWaitBoxHandle = *mut ::std::os::raw::c_void;
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_create(
+        message: *const ::std::os::raw::c_char,
+        out: *mut IdaxUIWaitBoxHandle,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_update(
+        handle: IdaxUIWaitBoxHandle,
+        message: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_cancelled(
+        handle: IdaxUIWaitBoxHandle,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_active(
+        handle: IdaxUIWaitBoxHandle,
+        out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_dismiss(handle: IdaxUIWaitBoxHandle);
+}
+unsafe extern "C" {
+    pub fn idax_ui_wait_box_free(handle: IdaxUIWaitBoxHandle);
+}
 unsafe extern "C" {
     pub fn idax_ui_ask_form(
         markup: *const ::std::os::raw::c_char,
         out: *mut ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_form_sval_bitset(
+        markup: *const ::std::os::raw::c_char,
+        sval: *mut i64,
+        bitset: *mut u16,
+        accepted_out: *mut ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_form_sval_path_bitset(
+        markup: *const ::std::os::raw::c_char,
+        sval: *mut i64,
+        path_in: *const ::std::os::raw::c_char,
+        for_saving: ::std::os::raw::c_int,
+        bitset: *mut u16,
+        accepted_out: *mut ::std::os::raw::c_int,
+        path_out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_form_path_bitset(
+        markup: *const ::std::os::raw::c_char,
+        path_in: *const ::std::os::raw::c_char,
+        for_saving: ::std::os::raw::c_int,
+        bitset: *mut u16,
+        accepted_out: *mut ::std::os::raw::c_int,
+        path_out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_form_radio_sval_path_bitset(
+        markup: *const ::std::os::raw::c_char,
+        radio: *mut u16,
+        sval: *mut i64,
+        path_in: *const ::std::os::raw::c_char,
+        for_saving: ::std::os::raw::c_int,
+        bitset: *mut u16,
+        accepted_out: *mut ::std::os::raw::c_int,
+        path_out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_form_three_svals_path_two_bitsets(
+        markup: *const ::std::os::raw::c_char,
+        first: *mut i64,
+        second: *mut i64,
+        third: *mut i64,
+        path_in: *const ::std::os::raw::c_char,
+        for_saving: ::std::os::raw::c_int,
+        first_bitset: *mut u16,
+        second_bitset: *mut u16,
+        accepted_out: *mut ::std::os::raw::c_int,
+        path_out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_ask_text(
+        prompt: *const ::std::os::raw::c_char,
+        default_value: *const ::std::os::raw::c_char,
+        max_size: usize,
+        accept_tabs: ::std::os::raw::c_int,
+        normal_font: ::std::os::raw::c_int,
+        out: *mut *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_copy_to_clipboard(text: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_read_clipboard(out: *mut *mut ::std::os::raw::c_char) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn idax_ui_clipboard_backend() -> *const ::std::os::raw::c_char;
 }
 unsafe extern "C" {
     pub fn idax_ui_create_custom_viewer(

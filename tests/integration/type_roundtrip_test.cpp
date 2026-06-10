@@ -246,6 +246,57 @@ void test_from_declaration() {
 }
 
 // ---------------------------------------------------------------------------
+// Test: bulk declaration import
+// ---------------------------------------------------------------------------
+void test_parse_declarations() {
+    std::cout << "--- parse_declarations bulk import ---\n";
+
+    auto empty = ida::type::parse_declarations("");
+    CHECK(!empty.has_value());
+    if (!empty)
+        CHECK(empty.error().category == ida::ErrorCategory::Validation);
+
+    ida::type::ParseDeclarationsOptions bad_options;
+    bad_options.pack_alignment = 3;
+    auto bad_pack = ida::type::parse_declarations("typedef int idax_bad_pack_t;",
+                                                  bad_options);
+    CHECK(!bad_pack.has_value());
+    if (!bad_pack)
+        CHECK(bad_pack.error().category == ida::ErrorCategory::Validation);
+
+    ida::type::ParseDeclarationsOptions options;
+    options.suppress_warnings = true;
+
+    const char declarations[] =
+        "typedef struct idax_bulk_decl_struct {\n"
+        "  int alpha;\n"
+        "  int beta;\n"
+        "} idax_bulk_decl_alias;\n"
+        "typedef idax_bulk_decl_alias *idax_bulk_decl_alias_ptr;\n";
+
+    auto report = ida::type::parse_declarations(declarations, options);
+    CHECK_OK(report);
+    if (report) {
+        CHECK(report->ok());
+        CHECK(report->error_count == 0);
+    }
+
+    auto found = ida::type::TypeInfo::by_name("idax_bulk_decl_alias");
+    CHECK_OK(found);
+    if (found) {
+        auto resolved = found->resolve_typedef();
+        CHECK_OK(resolved);
+        if (resolved)
+            CHECK(resolved->is_struct() || found->is_struct());
+    }
+
+    auto ptr = ida::type::TypeInfo::by_name("idax_bulk_decl_alias_ptr");
+    CHECK_OK(ptr);
+    if (ptr)
+        CHECK(ptr->is_pointer() || ptr->is_typedef());
+}
+
+// ---------------------------------------------------------------------------
 // Test: function type + calling convention workflows
 // ---------------------------------------------------------------------------
 void test_function_type_workflows() {
@@ -341,6 +392,96 @@ void test_enum_workflows() {
     CHECK(!bad_enum.has_value());
     if (!bad_enum)
         CHECK(bad_enum.error().category == ida::ErrorCategory::Validation);
+}
+
+// ---------------------------------------------------------------------------
+// Test: rich type layout metadata used by trida-style generators
+// ---------------------------------------------------------------------------
+void test_rich_type_layout_metadata() {
+    std::cout << "--- rich type layout metadata ---\n";
+
+    const char* declarations =
+        "enum idax_trida_enum { IDAX_TRIDA_A = 1, IDAX_TRIDA_B = 2 };\n"
+        "struct idax_trida_inner { int ix; unsigned short iy; };\n"
+        "struct idax_trida_layout {\n"
+        "  int first;\n"
+        "  unsigned flags:3;\n"
+        "  char name[8];\n"
+        "  struct idax_trida_inner inner;\n"
+        "  int (*callback)(struct idax_trida_inner *self, int count);\n"
+        "  enum idax_trida_enum kind;\n"
+        "};\n";
+
+    auto parsed = ida::type::parse_declarations(declarations);
+    CHECK_OK(parsed);
+
+    auto layout = ida::type::TypeInfo::by_name("idax_trida_layout");
+    CHECK_OK(layout);
+    if (layout) {
+        CHECK(layout->kind() == ida::type::TypeKind::Struct);
+        auto layout_name = layout->name();
+        CHECK_OK(layout_name);
+        if (layout_name)
+            CHECK(*layout_name == "idax_trida_layout");
+
+        auto details = layout->udt_details();
+        CHECK_OK(details);
+        if (details) {
+            CHECK(!details->is_union);
+            CHECK(details->total_size > 0);
+            CHECK(details->members.size() >= 5);
+
+            bool saw_bitfield = false;
+            for (const auto& member : details->members) {
+                if (member.name == "flags") {
+                    saw_bitfield = true;
+                    CHECK(member.is_bitfield);
+                    CHECK(member.bit_size == 3);
+                    CHECK(member.storage_byte_width > 0);
+                }
+                CHECK(member.bit_offset >= member.byte_offset * 8);
+            }
+            CHECK(saw_bitfield);
+        }
+
+        auto callback = layout->member_by_name("callback");
+        CHECK_OK(callback);
+        if (callback) {
+            CHECK(callback->type.is_pointer());
+            auto pointed = callback->type.pointee_type();
+            CHECK_OK(pointed);
+            if (pointed) {
+                auto function = pointed->function_details();
+                CHECK_OK(function);
+                if (function) {
+                    CHECK(function->return_type.is_integer());
+                    CHECK(function->arguments.size() == 2);
+                    if (function->arguments.size() == 2) {
+                        CHECK(function->arguments[0].type.is_pointer());
+                        CHECK(function->arguments[1].type.is_integer());
+                    }
+                }
+            }
+        }
+
+        auto decl = layout->declaration("sample");
+        CHECK_OK(decl);
+        if (decl)
+            CHECK(decl->find("sample") != std::string::npos);
+    }
+
+    auto enum_type = ida::type::TypeInfo::by_name("idax_trida_enum");
+    CHECK_OK(enum_type);
+    if (enum_type) {
+        auto details = enum_type->enum_details();
+        CHECK_OK(details);
+        if (details) {
+            CHECK(details->byte_width > 0);
+            CHECK(details->members.size() == 2);
+            if (details->members.size() == 2)
+                CHECK(details->members[1].value == 2);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -728,8 +869,10 @@ int main(int argc, char* argv[]) {
     test_composite_factories();
     test_type_decomposition_helpers();
     test_from_declaration();
+    test_parse_declarations();
     test_function_type_workflows();
     test_enum_workflows();
+    test_rich_type_layout_metadata();
     test_struct_lifecycle();
     test_union_creation();
     test_save_and_lookup();

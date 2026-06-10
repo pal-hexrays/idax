@@ -3,9 +3,11 @@
 ///        dock widgets, navigation, and event subscriptions.
 
 #include "detail/sdk_bridge.hpp"
+#include "detail/qt_clipboard_bridge.hpp"
 #include <ida/ui.hpp>
 #include <mutex>
 #include <atomic>
+#include <limits>
 #include <memory>
 #include <unordered_map>
 
@@ -78,6 +80,32 @@ Result<std::int64_t> ask_long(std::string_view prompt, std::int64_t default_valu
     return static_cast<std::int64_t>(val);
 }
 
+Result<std::string> ask_text(std::string_view prompt,
+                             std::string_view default_value,
+                             std::size_t max_size,
+                             bool accept_tabs,
+                             bool normal_font) {
+    qstring answer;
+    qstring qprompt = ida::detail::to_qstring(prompt);
+    qstring qdefault = ida::detail::to_qstring(default_value);
+
+    std::string formatted_prompt;
+    if (accept_tabs)
+        formatted_prompt += "ACCEPT TABS\n";
+    if (normal_font)
+        formatted_prompt += "NORMAL FONT\n";
+    formatted_prompt += "%s";
+
+    if (!::ask_text(&answer,
+                    max_size,
+                    qdefault.empty() ? nullptr : qdefault.c_str(),
+                    formatted_prompt.c_str(),
+                    qprompt.c_str())) {
+        return std::unexpected(Error::validation("User cancelled multiline input"));
+    }
+    return ida::detail::to_string(answer);
+}
+
 Result<bool> ask_form(std::string_view markup) {
     if (markup.empty())
         return std::unexpected(Error::validation("Form markup cannot be empty"));
@@ -87,6 +115,63 @@ Result<bool> ask_form(std::string_view markup) {
     if (rc < 0)
         return std::unexpected(Error::sdk("ask_form failed"));
     return rc > 0;
+}
+
+std::string_view clipboard_backend() noexcept {
+    return detail::clipboard_backend_name();
+}
+
+Status copy_to_clipboard(std::string_view text) {
+    return detail::qt_copy_to_clipboard(text);
+}
+
+Result<std::string> read_clipboard() {
+    return detail::qt_read_clipboard();
+}
+
+// ── Wait/progress UI ───────────────────────────────────────────────────
+
+WaitBox::WaitBox(std::string_view message) {
+    qstring qmessage = ida::detail::to_qstring(message);
+    ::show_wait_box("%s", qmessage.c_str());
+    active_ = true;
+}
+
+WaitBox::~WaitBox() {
+    dismiss();
+}
+
+WaitBox::WaitBox(WaitBox&& other) noexcept
+    : active_(other.active_) {
+    other.active_ = false;
+}
+
+WaitBox& WaitBox::operator=(WaitBox&& other) noexcept {
+    if (this != &other) {
+        dismiss();
+        active_ = other.active_;
+        other.active_ = false;
+    }
+    return *this;
+}
+
+Status WaitBox::update(std::string_view message) {
+    if (!active_)
+        return std::unexpected(Error::validation("WaitBox is not active"));
+    qstring qmessage = ida::detail::to_qstring(message);
+    ::replace_wait_box("%s", qmessage.c_str());
+    return ida::ok();
+}
+
+bool WaitBox::cancelled() const noexcept {
+    return active_ && ::user_cancelled();
+}
+
+void WaitBox::dismiss() noexcept {
+    if (active_) {
+        ::hide_wait_box();
+        active_ = false;
+    }
 }
 
 // ── Navigation ──────────────────────────────────────────────────────────
@@ -1324,6 +1409,44 @@ Status attach_dynamic_action(PopupHandle popup,
 
     if (!ok)
         return std::unexpected(Error::sdk("attach_dynamic_action_to_popup failed"));
+
+    return ida::ok();
+}
+
+Status attach_registered_action(PopupHandle popup,
+                                const Widget& widget,
+                                std::string_view action_id,
+                                std::string_view menu_path) {
+    return attach_registered_action(popup,
+                                    static_cast<void*>(WidgetAccess::raw(widget)),
+                                    action_id,
+                                    menu_path);
+}
+
+Status attach_registered_action(PopupHandle popup,
+                                void* widget_handle,
+                                std::string_view action_id,
+                                std::string_view menu_path) {
+    if (popup == nullptr)
+        return std::unexpected(Error::validation("Popup handle is null"));
+    if (widget_handle == nullptr)
+        return std::unexpected(Error::validation("Widget handle is null"));
+    if (action_id.empty())
+        return std::unexpected(Error::validation("Action id is empty"));
+
+    auto* widget = static_cast<TWidget*>(widget_handle);
+    auto* popup_menu = static_cast<TPopupMenu*>(popup);
+    std::string id(action_id);
+    std::string path(menu_path);
+
+    if (!attach_action_to_popup(widget,
+                                popup_menu,
+                                id.c_str(),
+                                path.empty() ? nullptr : path.c_str(),
+                                SETMENU_INS)) {
+        return std::unexpected(Error::sdk("attach_action_to_popup failed",
+                                          std::string(action_id)));
+    }
 
     return ida::ok();
 }

@@ -51,8 +51,15 @@ set(IDAX_LIB_SEARCH_PATHS
     "${IDAX_ROOT}/build/Release"
     "${IDAX_ROOT}/build/Debug"
     "${IDAX_ROOT}/build/RelWithDebInfo"
+    "${IDAX_ROOT}/build-test"
+    "${IDAX_ROOT}/build-test-fetch"
+    "${IDAX_ROOT}/build-examples-fetch"
     "${CMAKE_INSTALL_PREFIX}/lib"
 )
+
+if(DEFINED ENV{IDAX_BUILD_DIR})
+    list(PREPEND IDAX_LIB_SEARCH_PATHS "$ENV{IDAX_BUILD_DIR}")
+endif()
 
 find_library(IDAX_LIBRARY
     NAMES idax libidax
@@ -72,6 +79,15 @@ if(DEFINED ENV{IDASDK})
     include_directories("${IDASDK_DIR}/include")
     add_compile_definitions(__EA64__)
     message(STATUS "IDA SDK: ${IDASDK_DIR}")
+
+    get_filename_component(IDASDK_DIR_BASENAME "${IDASDK_DIR}" NAME)
+    if(IDASDK_DIR_BASENAME STREQUAL "src" AND EXISTS "${IDASDK_DIR}/../lib")
+        get_filename_component(IDASDK_LIB_ROOT "${IDASDK_DIR}/.." ABSOLUTE)
+    elseif(EXISTS "${IDASDK_DIR}/lib")
+        set(IDASDK_LIB_ROOT "${IDASDK_DIR}")
+    elseif(EXISTS "${IDASDK_DIR}/../lib")
+        get_filename_component(IDASDK_LIB_ROOT "${IDASDK_DIR}/.." ABSOLUTE)
+    endif()
 else()
     message(WARNING "IDASDK environment variable not set. Build may fail.")
 endif()
@@ -141,30 +157,55 @@ if(IDA_INSTALL_DIR)
 
 endif()
 
-if(MSVC AND IDASDK_DIR AND (NOT IDALIB_LIBRARY OR NOT LIBIDA_LIBRARY OR NOT LIBPRO_LIBRARY))
-    set(IDA_LIB_DIR "${IDASDK_DIR}/lib/x64_win_vc_64")
-    if(NOT IDALIB_LIBRARY)
-        find_library(IDALIB_LIBRARY NAMES idalib PATHS "${IDA_LIB_DIR}" NO_DEFAULT_PATH)
+if(MSVC AND (NOT IDALIB_LIBRARY OR NOT LIBIDA_LIBRARY OR NOT LIBPRO_LIBRARY))
+    set(IDA_LIB_DIR_CANDIDATES)
+    if(IDASDK_LIB_ROOT)
+        list(APPEND IDA_LIB_DIR_CANDIDATES
+            "${IDASDK_LIB_ROOT}/lib/x64_win_64"
+            "${IDASDK_LIB_ROOT}/lib/x64_win_64_s"
+            "${IDASDK_LIB_ROOT}/lib/x64_win_vc_64"
+            "${IDASDK_LIB_ROOT}/lib/x64_win_vc_64_s")
     endif()
-    if(NOT LIBIDA_LIBRARY)
-        find_library(LIBIDA_LIBRARY NAMES ida PATHS "${IDA_LIB_DIR}" NO_DEFAULT_PATH)
+    if(IDA_INSTALL_DIR)
+        list(APPEND IDA_LIB_DIR_CANDIDATES
+            "${IDA_INSTALL_DIR}"
+            "${IDA_INSTALL_DIR}/lib")
     endif()
-    if(NOT LIBPRO_LIBRARY)
-        find_library(LIBPRO_LIBRARY NAMES pro PATHS "${IDA_LIB_DIR}" NO_DEFAULT_PATH)
-    endif()
-    
+
+    foreach(IDA_LIB_DIR IN LISTS IDA_LIB_DIR_CANDIDATES)
+        if(NOT IDALIB_LIBRARY)
+            if(EXISTS "${IDA_LIB_DIR}/idalib.lib")
+                set(IDALIB_LIBRARY "${IDA_LIB_DIR}/idalib.lib")
+            endif()
+        endif()
+        if(NOT LIBIDA_LIBRARY)
+            if(EXISTS "${IDA_LIB_DIR}/ida.lib")
+                set(LIBIDA_LIBRARY "${IDA_LIB_DIR}/ida.lib")
+            elseif(EXISTS "${IDA_LIB_DIR}/ida64.lib")
+                set(LIBIDA_LIBRARY "${IDA_LIB_DIR}/ida64.lib")
+            endif()
+        endif()
+        if(NOT LIBPRO_LIBRARY)
+            if(EXISTS "${IDA_LIB_DIR}/pro.lib")
+                set(LIBPRO_LIBRARY "${IDA_LIB_DIR}/pro.lib")
+            endif()
+        endif()
+    endforeach()
+
     if(IDALIB_LIBRARY)
         message(STATUS "idalib.lib: ${IDALIB_LIBRARY}")
     else()
-        message(WARNING "idalib.lib not found in ${IDA_LIB_DIR}")
+        message(WARNING "idalib.lib not found in searched Windows paths")
     endif()
     if(LIBIDA_LIBRARY)
         message(STATUS "ida.lib: ${LIBIDA_LIBRARY}")
     else()
-        message(WARNING "ida.lib not found in ${IDA_LIB_DIR}")
+        message(WARNING "ida.lib not found in searched Windows paths")
     endif()
     if(LIBPRO_LIBRARY)
         message(STATUS "pro.lib: ${LIBPRO_LIBRARY}")
+    else()
+        message(WARNING "pro.lib not found in searched Windows paths")
     endif()
 endif()
 
@@ -192,7 +233,9 @@ set(BINDING_SOURCES
     src/diagnostics_bind.cpp
     src/lumina_bind.cpp
     src/lines_bind.cpp
+    src/ui_bind.cpp
     src/decompiler_bind.cpp
+    src/path_bind.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${BINDING_SOURCES})

@@ -108,6 +108,70 @@ fn discover_ida_dir() -> Option<PathBuf> {
     None
 }
 
+fn normalized_sdk_lib_root(idasdk: &Path) -> PathBuf {
+    if idasdk.file_name().and_then(|s| s.to_str()) == Some("src") {
+        if let Some(parent) = idasdk.parent() {
+            if parent.join("lib").exists() {
+                return parent.to_path_buf();
+            }
+        }
+    }
+
+    if idasdk.join("lib").exists() {
+        return idasdk.to_path_buf();
+    }
+
+    idasdk.to_path_buf()
+}
+
+fn patch_bindgen_output(path: &Path) {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to read generated bindings {}: {}",
+            path.display(),
+            e
+        )
+    });
+
+    if !text.contains("pub struct IdaxMicrocodeInstruction {\n    pub _address: u8,\n}") {
+        return;
+    }
+
+    let marker = "#[repr(C)]\n#[derive(Debug, Default, Copy, Clone)]\npub struct IdaxMicrocodeInstruction {\n    pub _address: u8,\n}\n";
+    let start = text.find(marker).unwrap_or_else(|| {
+        panic!(
+            "Generated bindings for {} contain opaque IdaxMicrocodeInstruction, \
+             but the expected patch marker was not found",
+            path.display()
+        )
+    });
+
+    let remainder = &text[start..];
+    let end_marker = "unsafe extern \"C\" {\n    pub fn idax_microcode_instruction_free";
+    let end = remainder.find(end_marker).unwrap_or_else(|| {
+        panic!(
+            "Generated bindings for {} contain opaque IdaxMicrocodeInstruction, \
+             but the following FFI marker was not found",
+            path.display()
+        )
+    });
+
+    let replacement = "#[repr(C)]\n#[derive(Debug, Copy, Clone)]\npub struct IdaxMicrocodeInstruction {\n    pub opcode: ::std::os::raw::c_int,\n    pub left: IdaxMicrocodeOperand,\n    pub right: IdaxMicrocodeOperand,\n    pub destination: IdaxMicrocodeOperand,\n    pub floating_point_instruction: ::std::os::raw::c_int,\n}\n";
+
+    let mut patched = String::with_capacity(text.len());
+    patched.push_str(&text[..start]);
+    patched.push_str(replacement);
+    patched.push_str(&remainder[end..]);
+
+    std::fs::write(path, patched).unwrap_or_else(|e| {
+        panic!(
+            "Failed to write patched generated bindings {}: {}",
+            path.display(),
+            e
+        )
+    });
+}
+
 /// macOS: Link against IDA libraries with symlinks in OUT_DIR for runtime.
 ///
 /// Strategy:
@@ -167,37 +231,89 @@ fn link_ida_macos(sdk_lib_dir: &Path, _dst: &Path) {
 /// Linux: link against SDK stubs normally. The C shim runtime loader
 /// handles finding the real libraries via dlopen.
 fn link_ida_linux(sdk_lib_dir: &Path) {
+    let ida_dir = discover_ida_dir();
+
     if sdk_lib_dir.exists() {
         println!("cargo:rustc-link-search=native={}", sdk_lib_dir.display());
     }
-    if sdk_lib_dir.join("libida.so").exists() {
+    if let Some(ref dir) = ida_dir {
+        println!("cargo:rustc-link-search=native={}", dir.display());
+    }
+
+    let has_ida = sdk_lib_dir.join("libida.so").exists()
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("libida.so").exists());
+    let has_ida64 = sdk_lib_dir.join("libida64.so").exists()
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("libida64.so").exists());
+    let has_idalib = sdk_lib_dir.join("libidalib.so").exists()
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("libidalib.so").exists());
+    let has_pro = sdk_lib_dir.join("libpro.so").exists()
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("libpro.so").exists());
+
+    if has_ida {
         println!("cargo:rustc-link-lib=dylib=ida");
-        if sdk_lib_dir.join("libidalib.so").exists() {
-            println!("cargo:rustc-link-lib=dylib=idalib");
-        }
-    } else if sdk_lib_dir.join("libida64.so").exists() {
+    } else if has_ida64 {
         println!("cargo:rustc-link-lib=dylib=ida64");
-        if sdk_lib_dir.join("libidalib.so").exists() {
-            println!("cargo:rustc-link-lib=dylib=idalib");
-        }
+    }
+    if has_idalib {
+        println!("cargo:rustc-link-lib=dylib=idalib");
+    }
+    if has_pro {
+        println!("cargo:rustc-link-lib=dylib=pro");
     }
 }
 
 /// Windows: link against SDK .lib import stubs.
-fn link_ida_windows(sdk_lib_dir: &Path) {
-    if sdk_lib_dir.exists() {
-        println!("cargo:rustc-link-search=native={}", sdk_lib_dir.display());
+fn link_ida_windows(sdk_lib_root: &Path) {
+    let ida_dir = discover_ida_dir();
+
+    let sdk_lib_dirs = [
+        sdk_lib_root.join("lib").join("x64_win_64"),
+        sdk_lib_root.join("lib").join("x64_win_64_s"),
+        sdk_lib_root.join("lib").join("x64_win_vc_64"),
+        sdk_lib_root.join("lib").join("x64_win_vc_64_s"),
+        sdk_lib_root.join("lib"),
+    ];
+
+    for dir in &sdk_lib_dirs {
+        if dir.exists() {
+            println!("cargo:rustc-link-search=native={}", dir.display());
+        }
     }
-    if sdk_lib_dir.join("ida.lib").exists() {
+    if let Some(ref dir) = ida_dir {
+        println!("cargo:rustc-link-search=native={}", dir.display());
+    }
+
+    let has_ida = sdk_lib_dirs.iter().any(|d| d.join("ida.lib").exists())
+        || ida_dir.as_ref().is_some_and(|d| d.join("ida.lib").exists());
+    let has_ida64 = sdk_lib_dirs.iter().any(|d| d.join("ida64.lib").exists())
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("ida64.lib").exists());
+    let has_idalib = sdk_lib_dirs.iter().any(|d| d.join("idalib.lib").exists())
+        || ida_dir
+            .as_ref()
+            .is_some_and(|d| d.join("idalib.lib").exists());
+    let has_pro = sdk_lib_dirs.iter().any(|d| d.join("pro.lib").exists())
+        || ida_dir.as_ref().is_some_and(|d| d.join("pro.lib").exists());
+
+    if has_ida {
         println!("cargo:rustc-link-lib=dylib=ida");
-        if sdk_lib_dir.join("idalib.lib").exists() {
-            println!("cargo:rustc-link-lib=dylib=idalib");
-        }
-    } else if sdk_lib_dir.join("ida64.lib").exists() {
+    } else if has_ida64 {
         println!("cargo:rustc-link-lib=dylib=ida64");
-        if sdk_lib_dir.join("idalib.lib").exists() {
-            println!("cargo:rustc-link-lib=dylib=idalib");
-        }
+    }
+    if has_idalib {
+        println!("cargo:rustc-link-lib=dylib=idalib");
+    }
+    if has_pro {
+        println!("cargo:rustc-link-lib=dylib=pro");
     }
 }
 
@@ -334,16 +450,18 @@ fn main() {
     });
 
     // ── Locate IDA SDK libraries ────────────────────────────────────────
+    let sdk_lib_root = normalized_sdk_lib_root(&idasdk);
+
     let sdk_lib_dir = if cfg!(target_os = "macos") {
         if cfg!(target_arch = "aarch64") {
-            idasdk.join("lib").join("arm64_mac_clang_64")
+            sdk_lib_root.join("lib").join("arm64_mac_clang_64")
         } else {
-            idasdk.join("lib").join("x64_mac_clang_64")
+            sdk_lib_root.join("lib").join("x64_mac_clang_64")
         }
     } else if cfg!(target_os = "linux") {
-        idasdk.join("lib").join("x64_linux_gcc_64")
+        sdk_lib_root.join("lib").join("x64_linux_gcc_64")
     } else if cfg!(target_os = "windows") {
-        idasdk.join("lib").join("x64_win_vc_64")
+        sdk_lib_root.join("lib").join("x64_win_vc_64")
     } else {
         panic!("Unsupported target OS for IDA SDK");
     };
@@ -351,7 +469,7 @@ fn main() {
     let sdk_lib_dir = if sdk_lib_dir.exists() {
         sdk_lib_dir
     } else {
-        idasdk.join("lib")
+        sdk_lib_root.join("lib")
     };
 
     // ── Compile C++ shim ────────────────────────────────────────────────
@@ -444,7 +562,7 @@ fn main() {
         link_ida_linux(&sdk_lib_dir);
         println!("cargo:rustc-link-lib=stdc++");
     } else if cfg!(target_os = "windows") {
-        link_ida_windows(&sdk_lib_dir);
+        link_ida_windows(&sdk_lib_root);
     }
 
     // ── Run bindgen ─────────────────────────────────────────────────────
@@ -461,9 +579,11 @@ fn main() {
         .expect("Failed to generate bindings via bindgen");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let bindings_path = out_dir.join("bindings.rs");
     bindings
-        .write_to_file(out_dir.join("bindings.rs"))
+        .write_to_file(&bindings_path)
         .expect("Failed to write bindings.rs");
+    patch_bindgen_output(&bindings_path);
 
     println!("cargo:rerun-if-changed=shim/idax_shim.h");
     println!("cargo:rerun-if-changed=shim/idax_shim.cpp");

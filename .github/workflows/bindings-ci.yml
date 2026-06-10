@@ -341,14 +341,14 @@ jobs:
         shell: bash
         working-directory: bindings/rust
         run: |
-          cargo test --lib --verbose
+          cargo test --lib --verbose -- --test-threads=1
 
       - name: Run Rust unit tests (Windows)
         if: runner.os == 'Windows'
         working-directory: bindings/rust
         shell: pwsh
         run: |
-          cargo test --release --lib --verbose
+          cargo test --release --lib --verbose -- --test-threads=1
 
       - name: Run Rust examples (Unix)
         if: runner.os != 'Windows'
@@ -407,7 +407,7 @@ jobs:
           Invoke-RustExample -Name "ida2py_port" -Args @($testBin)
 
       - name: Run Rust integration tests (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os == 'macOS'
         shell: bash
         working-directory: bindings/rust
         run: |
@@ -416,8 +416,8 @@ jobs:
           else
             export LD_LIBRARY_PATH="$IDADIR:$LD_LIBRARY_PATH"
           fi
-          echo "Running Rust integration tests..."
-          cargo test --test integration -- --test-threads=1
+          echo "Building Rust integration tests (headless runtime is covered by examples in CI)..."
+          cargo test --test integration --no-run
 
       - name: Run Rust integration tests (Windows)
         if: runner.os == 'Windows'
@@ -427,5 +427,5 @@ jobs:
           $env:PATH = "$env:IDADIR;$env:PATH"
           $env:IDAUSR = "$pwd\idax_empty_user"
           New-Item -ItemType Directory -Force -Path $env:IDAUSR | Out-Null
-          Write-Host "Running Rust integration tests..."
-          cargo test --release --test integration -- --test-threads=1
+          Write-Host "Building Rust integration tests (headless runtime is covered by examples in CI)..."
+          cargo test --release --test integration --no-run

@@ -415,6 +415,73 @@ Status define_stack_variable(Address func_ea, std::string_view name,
     return ida::ok();
 }
 
+Status set_prototype(Address func_ea, const ida::type::TypeInfo& type) {
+    func_t* fn = get_func(func_ea);
+    if (fn == nullptr)
+        return std::unexpected(Error::not_found("No function at address",
+                                                std::to_string(func_ea)));
+
+    auto* impl = ida::type::TypeInfoAccess::get(type);
+    if (impl == nullptr)
+        return std::unexpected(Error::internal("TypeInfo has null implementation"));
+
+    if (!impl->ti.is_func())
+        return std::unexpected(Error::validation("TypeInfo is not a function prototype"));
+
+    if (!apply_tinfo(fn->start_ea, impl->ti, TINFO_DEFINITE | TINFO_STRICT))
+        return std::unexpected(Error::sdk("apply_tinfo(function prototype) failed",
+                                          std::to_string(fn->start_ea)));
+    return ida::ok();
+}
+
+Status apply_decl(Address func_ea, std::string_view c_decl) {
+    func_t* fn = get_func(func_ea);
+    if (fn == nullptr)
+        return std::unexpected(Error::not_found("No function at address",
+                                                std::to_string(func_ea)));
+    if (c_decl.empty())
+        return std::unexpected(Error::validation("C declaration cannot be empty"));
+
+    std::string decl(c_decl);
+    if (!decl.empty() && decl.back() != ';')
+        decl.push_back(';');
+    tinfo_t tif;
+    qstring parsed_name;
+    if (!parse_decl(&tif, &parsed_name, nullptr, decl.c_str(), PT_SIL)) {
+        return std::unexpected(Error::validation("Invalid C declaration", decl));
+    }
+    if (!tif.is_func())
+        return std::unexpected(Error::validation("Declaration is not a function prototype", decl));
+    if (!apply_tinfo(fn->start_ea, tif, TINFO_DEFINITE | TINFO_STRICT))
+        return std::unexpected(Error::sdk("apply_tinfo(parsed prototype) failed", decl));
+    return ida::ok();
+}
+
+Result<std::string> declaration(Address func_ea, std::string_view name_override) {
+    func_t* fn = get_func(func_ea);
+    if (fn == nullptr)
+        return std::unexpected(Error::not_found("No function at address",
+                                                std::to_string(func_ea)));
+
+    tinfo_t type;
+    if (!get_tinfo(&type, fn->start_ea))
+        return std::unexpected(Error::not_found("No function type at address",
+                                                std::to_string(fn->start_ea)));
+
+    qstring qname;
+    if (!name_override.empty()) {
+        qname = ida::detail::to_qstring(name_override);
+    } else if (get_func_name(&qname, fn->start_ea) <= 0 || qname.empty()) {
+        qname.sprnt("sub_%llX", static_cast<unsigned long long>(fn->start_ea));
+    }
+
+    qstring printed;
+    if (!type.print(&printed, qname.c_str(), PRTYPE_1LINE | PRTYPE_TYPE | PRTYPE_SEMI))
+        return std::unexpected(Error::sdk("Failed to print function declaration",
+                                          std::to_string(fn->start_ea)));
+    return ida::detail::to_string(printed);
+}
+
 // ── Register variable operations ────────────────────────────────────────
 
 Status add_register_variable(Address func_ea,

@@ -27,17 +27,21 @@ set(IDAX_EXAMPLE_SOURCES
     plugin/storage_metadata_plugin.cpp
     plugin/lifter_port_plugin.cpp
     plugin/qtform_renderer_plugin.cpp
+    plugin/qtform_renderer_bridge.hpp
     plugin/qtform_renderer_widget.hpp
     plugin/qtform_renderer_widget.cpp
     plugin/drawida_port_plugin.cpp
+    plugin/drawida_port_bridge.hpp
     plugin/drawida_port_widget.hpp
     plugin/drawida_port_widget.cpp
     plugin/ida_names_port_plugin.cpp
     plugin/abyss_port_plugin.cpp
     plugin/driverbuddy_port_plugin.cpp
+    plugin/codedump_parity_probe_plugin.cpp
     plugin/idapcode_port_plugin.cpp
     plugin/driverbuddy_wdf_slots.inc
     loader/advanced_loader.cpp
+    loader/sep_firmware_loader.cpp
     procmod/advanced_procmod.cpp
 
     # Full parity example (real-world port pattern).
@@ -104,6 +108,7 @@ if(IDAX_BUILD_EXAMPLE_ADDONS)
         SOURCES
             plugin/qtform_renderer_plugin.cpp
             plugin/qtform_renderer_widget.cpp
+            plugin/qtform_renderer_bridge.hpp
             plugin/qtform_renderer_widget.hpp
         LIBRARIES idax::idax
     )
@@ -114,6 +119,7 @@ if(IDAX_BUILD_EXAMPLE_ADDONS)
         SOURCES
             plugin/drawida_port_plugin.cpp
             plugin/drawida_port_widget.cpp
+            plugin/drawida_port_bridge.hpp
             plugin/drawida_port_widget.hpp
         LIBRARIES idax::idax
     )
@@ -130,6 +136,11 @@ if(IDAX_BUILD_EXAMPLE_ADDONS)
 
     ida_add_plugin(idax_driverbuddy_port_plugin
         SOURCES plugin/driverbuddy_port_plugin.cpp
+        LIBRARIES idax::idax
+    )
+
+    ida_add_plugin(idax_codedump_parity_probe_plugin
+        SOURCES plugin/codedump_parity_probe_plugin.cpp
         LIBRARIES idax::idax
     )
 
@@ -172,6 +183,11 @@ if(IDAX_BUILD_EXAMPLE_ADDONS)
 
     ida_add_loader(idax_xbin_loader
         SOURCES loader/advanced_loader.cpp
+        LIBRARIES idax::idax
+    )
+
+    ida_add_loader(idax_sep_firmware_loader
+        SOURCES loader/sep_firmware_loader.cpp
         LIBRARIES idax::idax
     )
 

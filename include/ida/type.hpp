@@ -15,6 +15,10 @@ namespace ida::type {
 
 // Forward declaration so Member can reference TypeInfo.
 class TypeInfo;
+struct FunctionArgument;
+struct FunctionDetails;
+struct UdtDetails;
+struct EnumDetails;
 
 enum class CallingConvention {
     Unknown,
@@ -28,10 +32,78 @@ enum class CallingConvention {
     UserDefined,
 };
 
+enum class TypeKind {
+    Unknown,
+    Void,
+    Bool,
+    Character,
+    SignedInteger,
+    UnsignedInteger,
+    FloatingPoint,
+    Pointer,
+    Array,
+    Function,
+    Struct,
+    Union,
+    Enum,
+    Typedef,
+};
+
+enum class EnumRadix {
+    Unknown,
+    Binary,
+    Octal,
+    Decimal,
+    Hexadecimal,
+};
+
 struct EnumMember {
     std::string name;
     std::uint64_t value{0};
     std::string comment;
+};
+
+struct ParseDeclarationsOptions {
+    bool suppress_warnings{false};
+    bool relaxed_namespaces{false};
+    bool raw_argument_names{false};
+    bool no_mangle{false};
+    std::size_t pack_alignment{0};  ///< 0=default, otherwise one of 1,2,4,8,16.
+};
+
+struct ParseDeclarationsReport {
+    std::size_t error_count{0};
+
+    [[nodiscard]] bool ok() const noexcept { return error_count == 0; }
+};
+
+struct UsedMemberOffsets {
+    std::string type_name;
+    std::vector<int> byte_offsets;
+};
+
+struct TypeRenderOptions {
+    bool size_comments{false};
+    bool trim_unreferenced{false};
+    std::vector<UsedMemberOffsets> used_offsets;
+};
+
+struct TypeGraphOptions {
+    enum class Mode {
+        Simple,
+        Table,
+    };
+
+    Mode mode{Mode::Simple};
+    int max_depth{-1};
+    bool include_enums{true};
+    bool include_typedefs{true};
+};
+
+struct TypeDeclaration {
+    std::uint32_t ordinal{0};
+    std::string name;
+    std::string declaration;
 };
 
 /// Opaque handle representing a type in the IDA database.
@@ -89,9 +161,17 @@ public:
     [[nodiscard]] bool is_union()          const;
     [[nodiscard]] bool is_enum()           const;
     [[nodiscard]] bool is_typedef()        const;
+    [[nodiscard]] bool is_bool()           const;
+    [[nodiscard]] bool is_char()           const;
+    [[nodiscard]] bool is_unsigned_char()  const;
+    [[nodiscard]] bool is_signed()         const;
+
+    [[nodiscard]] TypeKind kind() const;
+    [[nodiscard]] Result<std::string> name() const;
 
     [[nodiscard]] Result<std::size_t> size() const;
     [[nodiscard]] Result<std::string> to_string() const;
+    [[nodiscard]] Result<std::string> declaration(std::string_view declarator_name = {}) const;
 
     /// For pointer types, return the pointee type.
     [[nodiscard]] Result<TypeInfo> pointee_type() const;
@@ -108,9 +188,11 @@ public:
 
     [[nodiscard]] Result<TypeInfo> function_return_type() const;
     [[nodiscard]] Result<std::vector<TypeInfo>> function_argument_types() const;
+    [[nodiscard]] Result<FunctionDetails> function_details() const;
     [[nodiscard]] Result<CallingConvention> calling_convention() const;
     [[nodiscard]] Result<bool> is_variadic_function() const;
     [[nodiscard]] Result<std::vector<EnumMember>> enum_members() const;
+    [[nodiscard]] Result<EnumDetails> enum_details() const;
 
     /// Number of struct/union members (0 for non-UDT types).
     [[nodiscard]] Result<std::size_t> member_count() const;
@@ -119,6 +201,9 @@ public:
 
     /// Retrieve all members of a struct/union.
     [[nodiscard]] Result<std::vector<struct Member>> members() const;
+
+    /// Retrieve complete struct/union layout details.
+    [[nodiscard]] Result<UdtDetails> udt_details() const;
 
     /// Find a member by name.
     [[nodiscard]] Result<struct Member> member_by_name(std::string_view name) const;
@@ -153,7 +238,40 @@ struct Member {
     TypeInfo    type;
     std::size_t byte_offset{0};  ///< Offset from struct start, in bytes.
     std::size_t bit_size{0};     ///< Total size in bits.
+    std::size_t bit_offset{0};    ///< Offset from struct start, in bits.
+    std::size_t storage_byte_width{0}; ///< Bitfield backing storage width; 0 for non-bitfields.
+    bool is_baseclass{false};
+    bool is_vftable{false};
+    bool is_gap{false};
+    bool is_bitfield{false};
     std::string comment;
+};
+
+struct FunctionArgument {
+    std::string name;
+    TypeInfo type;
+};
+
+struct FunctionDetails {
+    TypeInfo return_type;
+    std::vector<FunctionArgument> arguments;
+    CallingConvention calling_convention{CallingConvention::Unknown};
+    bool variadic{false};
+};
+
+struct UdtDetails {
+    std::size_t total_size{0};
+    bool is_union{false};
+    bool is_cpp_object{false};
+    bool is_vftable{false};
+    std::vector<Member> members;
+};
+
+struct EnumDetails {
+    std::size_t byte_width{0};
+    bool signed_values{false};
+    EnumRadix radix{EnumRadix::Unknown};
+    std::vector<EnumMember> members;
 };
 
 /// Retrieve the type applied at an address.
@@ -201,6 +319,33 @@ Result<TypeInfo> ensure_named_type(std::string_view type_name,
 /// Apply a named type from the local type library at an address.
 /// Equivalent to looking up the type by name and calling apply().
 Status apply_named_type(Address ea, std::string_view type_name);
+
+/// Parse and import a block of local type declarations into the current IDB.
+///
+/// This wraps IDA's bulk declaration parser for workflows that need to import
+/// ordered type-definition blocks rather than parse one standalone TypeInfo.
+Result<ParseDeclarationsReport>
+parse_declarations(std::string_view declarations,
+                   const ParseDeclarationsOptions& options = ParseDeclarationsOptions{});
+
+/// Render named local types plus dependencies as C declarations.
+Result<std::string> render_named_declarations(
+    const std::vector<std::string>& names,
+    int max_depth = -1,
+    const TypeRenderOptions& options = TypeRenderOptions{});
+
+/// Render local type ordinals plus dependencies as C declarations.
+Result<std::string> render_ordinal_declarations(
+    const std::vector<std::uint32_t>& ordinals,
+    const TypeRenderOptions& options = TypeRenderOptions{});
+
+/// Render a Graphviz DOT type dependency graph rooted at a named type.
+Result<std::string> render_type_graph(std::string_view root_name,
+                                      const TypeGraphOptions& options = TypeGraphOptions{});
+
+/// Return dependency-ordered declarations for types reachable from ordinals.
+Result<std::vector<TypeDeclaration>>
+declarations_for_ordinals(const std::vector<std::uint32_t>& ordinals);
 
 } // namespace ida::type
 

@@ -31,6 +31,9 @@ Current overall phase status:
 - Phase 18: ~100% (Scenario-driven documentation remediation complete: all 10 evaluated practical-use-case docs delivered, cross-cutting API-surface selection guide and scenario acceptance checklist mapping added, cookbook/traversal docs rebalanced to C++-first default presentation, and case-10 safety/perf guidance reframed as wrapper-vs-raw-SDK)
 - Phase 19: 100% (examples-to-bindings continuation: Node tool-style ports added for `idalib_dump`/`idalib_lumina`/`ida2py`; Rust standalone adaptation set expanded with procmod + plugin-style standalone flows including `ida_names_port_plugin`, `qtform_renderer_plugin`, `driverbuddy_port_plugin`, and `abyss_port_plugin`; `jbc_full_loader` rewritten to actively mutate database layout instead of just printing text; TypeScript + Cargo example checks passing; Node addon runtime linkage repaired via rebuild with correct IDA install path; runtime matrix passes for Node tool examples and expanded Rust adaptation set including JBC rows via synthetic fixture validation; ported UI-constrained `idapcode` and `lifter` analysis slices to headless examples)
 - Phase 20: ~75% (real-IDA CI hardening in progress: deterministic installer resolution + macOS `IDADIR` normalization landed; Node example argv contract fixed; Windows Node import-library fallback hardened; workflow now uses Windows-native shells/runtime path propagation for Rust/Node example execution to avoid Git-Bash linker collisions and missing-DLL runtime failures)
+- Phase 21: 100% (example loader port continuation: completed `sep_firmware_loader.cpp` as a full-functionality idax loader port of the Binary Ninja SEP firmware plugin, covering SEP firmware detection, module-table parsing, Mach-O/raw module mapping, shared-library slide handling, header/load-command annotations, firmware type definitions/application, pointer rewrite passes, entry registration, symbol import, and example build/docs wiring)
+- Phase 22: ~99% (ida-cdump parity closure in progress: wait-box UI, multiline text, typed-form C++ bindings/FormBuilder plus fixed-shape Node/Rust typed-form entrypoints, optional Qt clipboard helpers with Node/Rust wrappers and an IDA-compatible `QT_NAMESPACE=QT` build gate, IDB path, portable path helpers, Hex-Rays popup-population events, scoped Hex-Rays ownership, Local Types action-context type references, lvar/prototype metadata helpers, read-only ctree migration helpers, bulk local type declaration import, host-gated runtime harness and runner script including Hex-Rays scoped-session runtime evidence, compact parity probe example, Qt example build bridge, Node native build/runtime validation, and Rust high-level no-run validation are implemented; the updated remaining queue is interactive modal form and Qt clipboard evidence)
+- Phase 23: 100% (ida-trida port parity complete: plugin shell ported to idax actions/forms/wait-box/path/clipboard helpers, GitHub Actions build matrix added, rich `ida::type` layout/function/enum metadata API implemented in C++ with Node/Rust binding surfaces, trida generator migrated off direct `typeinf.hpp` use, docs/agent notes updated, and focused C++/Node/Rust/trida validation passed)
 
 ### Phase 18 TODO Action Items (Complete)
 
@@ -57,14 +60,46 @@ Current overall phase status:
 
 ---
 
+### Phase 21 TODO Action Items (Example Loader Port Continuation)
+
+- [x] P21.1 Port `/Users/int/Downloads/sep-binja-main` SEP firmware Binary Ninja loader into a native idax example loader.
+- [x] P21.2 Wire the new loader into `examples/CMakeLists.txt` and document it in `examples/README.md`.
+- [x] P21.3 Validate the new example loader builds cleanly as `idax_sep_firmware_loader`.
+
+---
+
 ### Phase 20 TODO Action Items (Real-IDA CI Hardening)
 
 - [x] P20.1 Fix Node bindings workflow example invocation to pass only expected CLI arguments.
 - [x] P20.2 Avoid Windows debug CRT link failures in Rust bindings workflow by building/running examples in `--release`.
 - [x] P20.3 Harden Node Windows linkage discovery so MSVC import libs are resolved from `IDASDK` even when `IDADIR` is present.
 - [x] P20.4 Fix Windows workflow shell/runtime routing so Rust uses MSVC `link.exe` (not `/usr/bin/link`) and examples resolve IDA DLLs via `PATH`.
-- [~] P20.5 Re-run `Bindings CI` matrix and close residual runtime/linking regressions (current focus: validate Node macOS decompiler-wrapper pre-close disposal for `complexity_metrics` exit segfaults and verify Windows Rust runtime hardening after link fixes: minimal init argv, isolated `IDAUSR`, trace toggles (`IDAX_RUST_EXAMPLE_TRACE=1`), fixture-IDB input (avoid raw PE loader path), and build+direct-exec workflow for improved failure attribution).
+- [~] P20.5 Re-run `Bindings CI` matrix and close residual runtime/linking regressions (current focus: validate Node macOS decompiler-wrapper pre-close disposal for `complexity_metrics` exit segfaults; verify Windows Rust runtime hardening after link fixes: minimal init argv, isolated `IDAUSR`, trace toggles (`IDAX_RUST_EXAMPLE_TRACE=1`), fixture-IDB input (avoid raw PE loader path), and build+direct-exec workflow for improved failure attribution; keep `Validation Matrix` link-safe after the loader bridge export change by providing a non-loader fallback for `idax_loader_bridge_init` while preserving real loader-module `LDSC` exports; normalize bindings-side SDK library discovery so `IDASDK=/.../ida-sdk/src` still resolves platform import libs/stubs from the checkout root or installed `IDADIR`; and account for current Windows SDK layout using `x64_win_64` / `x64_win_64_s` while restricting Rust integration execution to the stable macOS/Windows paths in `Bindings CI`).
 - [x] P20.6 Close `ida::database::set_address_bitness` parity across C++ API surface checks, Node/Rust bindings, and docs/agent catalogs.
 - [x] P20.7 Close `MicrocodeContext` introspection parity across Node/Rust bindings and documentation/catalog surfaces.
 
 ---
+
+### Phase 22 TODO Action Items (ida-cdump Parity Closure)
+
+- [~] P22.1 Add typed `ida::ui::ask_form` bindings and a compile-time typed `FormBuilder`. (C++ API, Node/Rust fixed-entrypoint bindings, and host-gated modal test path landed; interactive host execution remains pending.)
+- [x] P22.2 Add `ida::ui::WaitBox` RAII progress/cancellation helpers.
+- [x] P22.3 Expose Hex-Rays `hxe_populating_popup` as `ida::decompiler::on_populating_popup`.
+- [x] P22.4 Add Local Types `TypeRef` payload support to `ida::plugin::ActionContext`.
+- [~] P22.5 Add Qt clipboard, multiline `ask_text`, `database::idb_path`, and path-helper coverage. (`ask_text`, `idb_path`, `ida::path`, optional Qt clipboard helpers, Node/Rust wrappers for clipboard/text/path helpers, host-gated clipboard test path, Qt header bridge, and `QT_NAMESPACE=QT` configure guard landed; Qt UI-host execution remains pending.)
+- [x] P22.6 Add Hex-Rays lvar-settings snapshot/writeback, lvar comment writeback, and function prototype apply APIs.
+- [x] P22.7 Add read-only ctree migration helpers needed by `ida-cdump` analysis.
+- [x] P22.8 Update docs/examples/tests and map each `ida-cdump` gap row to the new idax API. (`docs/codedump_migration_checklist.md` maps every updated gap row; compact parity probe example, local validation, Node native/runtime validation, and Rust no-run validation landed.)
+- [x] P22.9 Add a scoped Hex-Rays initialization/lifetime helper for plugin-host ownership. (C++ API, Node/Rust owned-session wrappers, example lifecycle coverage, and `IDAX_RUN_HEXRAYS_SESSION=1` host runtime execution pass.)
+- [x] P22.10 Add bulk local type declaration import over SDK `parse_decls` for `ida-cdump` metadata-apply migration, with Node/Rust wrappers.
+
+---
+
+### Phase 23 TODO Action Items (ida-trida Port Parity)
+
+- [x] P23.1 Port `/models/dev/ida-trida` build/plugin shell to consume `idax::idax` instead of vendored ida-cmake and raw SDK UI/action/clipboard helpers.
+- [x] P23.2 Add ida-trida GitHub Actions build coverage with Linux, macOS x86_64, macOS arm64, and Windows plugin artifact jobs.
+- [x] P23.3 Add rich C++ `ida::type` metadata needed by trida (`TypeKind`, named declarations, function details, enum details, UDT layout/member bit offsets and flags) with API-surface and integration coverage.
+- [x] P23.4 Mirror the rich type metadata through Node and Rust binding surfaces, with structural/no-run tests that respect host initialization constraints.
+- [x] P23.5 Port trida's Frida generator from direct SDK `typeinf.hpp` layout walking to opaque idax type APIs.
+- [x] P23.6 Refresh docs/validation notes and run final focused idax + trida validation.

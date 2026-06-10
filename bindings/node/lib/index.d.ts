@@ -47,6 +47,89 @@ export interface IdaxError extends Error {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ui namespace
+// ═══════════════════════════════════════════════════════════════════════════
+
+export namespace ui {
+    class WaitBox {
+        constructor(message: string);
+        update(message: string): void;
+        cancelled(): boolean;
+        dismiss(): void;
+        active(): boolean;
+    }
+
+    interface FormPathOptions {
+        /** If true, IDA treats path controls as save-path fields; otherwise open-path fields. */
+        forSaving?: boolean;
+    }
+
+    interface SvalBitsetFormResult {
+        accepted: boolean;
+        sval: bigint;
+        bitset: number;
+    }
+
+    interface SvalPathBitsetFormResult extends SvalBitsetFormResult {
+        path: string;
+    }
+
+    interface PathBitsetFormResult {
+        accepted: boolean;
+        path: string;
+        bitset: number;
+    }
+
+    interface RadioSvalPathBitsetFormResult extends SvalPathBitsetFormResult {
+        radio: number;
+    }
+
+    interface ThreeSvalsPathTwoBitsetsFormResult {
+        accepted: boolean;
+        first: bigint;
+        second: bigint;
+        third: bigint;
+        path: string;
+        firstBitset: number;
+        secondBitset: number;
+    }
+
+    /** Show a fixed-shape typed form with `(sval_t*, ushort*)` bindings. */
+    function askFormSvalBitset(markup: string, sval: bigint | number, bitset: number): SvalBitsetFormResult;
+
+    /** Show a fixed-shape typed form with `(sval_t*, char[QMAXPATH], ushort*)` bindings. */
+    function askFormSvalPathBitset(markup: string, sval: bigint | number, path: string, bitset: number, options?: FormPathOptions): SvalPathBitsetFormResult;
+
+    /** Show a fixed-shape typed form with `(char[QMAXPATH], ushort*)` bindings. */
+    function askFormPathBitset(markup: string, path: string, bitset: number, options?: FormPathOptions): PathBitsetFormResult;
+
+    /** Show a fixed-shape typed form with `(ushort*, sval_t*, char[QMAXPATH], ushort*)` bindings. */
+    function askFormRadioSvalPathBitset(markup: string, radio: number, sval: bigint | number, path: string, bitset: number, options?: FormPathOptions): RadioSvalPathBitsetFormResult;
+
+    /** Show a fixed-shape typed form with `(sval_t*, sval_t*, sval_t*, char[QMAXPATH], ushort*, ushort*)` bindings. */
+    function askFormThreeSvalsPathTwoBitsets(markup: string, first: bigint | number, second: bigint | number, third: bigint | number, path: string, firstBitset: number, secondBitset: number, options?: FormPathOptions): ThreeSvalsPathTwoBitsetsFormResult;
+
+    interface AskTextOptions {
+        maxSize?: number;
+        acceptTabs?: boolean;
+        normalFont?: boolean;
+    }
+
+    /** Ask for multiline text in an IDA UI host. */
+    function askText(prompt: string, defaultValue?: string, options?: AskTextOptions): string;
+    function askText(prompt: string, options?: AskTextOptions): string;
+
+    /** Copy text to the host clipboard via Qt or a host clipboard command. */
+    function copyToClipboard(text: string): void;
+
+    /** Read text from the host clipboard. */
+    function readClipboard(): string;
+
+    /** Clipboard backend name, e.g. "Qt", "external:xclip", or "unsupported". */
+    function clipboardBackend(): string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // database namespace
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -138,6 +221,9 @@ export namespace database {
     /** Path to the original input file. */
     function inputFilePath(): string;
 
+    /** Path to the current IDB/I64 database file. */
+    function idbPath(): string;
+
     /** IDA file type description string. */
     function fileTypeName(): string;
 
@@ -199,6 +285,21 @@ export namespace database {
 
     /** Whether the database is itself a snapshot (not the primary). */
     function isSnapshotDatabase(): boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// path namespace
+// ═══════════════════════════════════════════════════════════════════════════
+
+export namespace path {
+    /** Return the final path component using idax's portable path semantics. */
+    function basename(path: string): string;
+
+    /** Return the parent path component using idax's portable path semantics. */
+    function dirname(path: string): string;
+
+    /** Whether the path currently names an existing directory. */
+    function isDirectory(path: string): boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -545,6 +646,12 @@ export namespace function_ {
 
     /** Define a new stack variable in the function's frame. */
     function defineStackVariable(funcAddr: Address, name: string, frameOffset: number, typeName: string): boolean;
+
+    /** Apply a function prototype parsed from a C declaration string. */
+    function setPrototype(funcAddr: Address, typeDecl: string): boolean;
+
+    /** Parse and apply a C declaration as the function prototype. */
+    function applyDecl(funcAddr: Address, cDecl: string): boolean;
 
     // ── Register variables ──────────────────────────────────────────────
 
@@ -1240,6 +1347,13 @@ export namespace type {
         | 'unknown' | 'cdecl' | 'stdcall' | 'pascal' | 'fastcall'
         | 'thiscall' | 'swift' | 'golang' | 'userDefined';
 
+    type TypeKind =
+        | 'unknown' | 'void' | 'bool' | 'character' | 'signedInteger'
+        | 'unsignedInteger' | 'floatingPoint' | 'pointer' | 'array'
+        | 'function' | 'struct' | 'union' | 'enum' | 'typedef';
+
+    type EnumRadix = 'unknown' | 'binary' | 'octal' | 'decimal' | 'hexadecimal';
+
     interface EnumMember {
         name: string;
         value: bigint;
@@ -1250,8 +1364,54 @@ export namespace type {
         name: string;
         type: TypeInfo;
         byteOffset: number;
+        bitOffset: number;
         bitSize: number;
+        storageByteWidth: number;
+        isBaseclass: boolean;
+        isVftable: boolean;
+        isGap: boolean;
+        isBitfield: boolean;
         comment: string;
+    }
+
+    interface FunctionArgument {
+        name: string;
+        type: TypeInfo;
+    }
+
+    interface FunctionDetails {
+        returnType: TypeInfo;
+        arguments: FunctionArgument[];
+        callingConvention: CallingConvention;
+        variadic: boolean;
+    }
+
+    interface UdtDetails {
+        totalSize: number;
+        isUnion: boolean;
+        isCppObject: boolean;
+        isVftable: boolean;
+        members: Member[];
+    }
+
+    interface EnumDetails {
+        byteWidth: number;
+        signedValues: boolean;
+        radix: EnumRadix;
+        members: EnumMember[];
+    }
+
+    interface ParseDeclarationsOptions {
+        suppressWarnings?: boolean;
+        relaxedNamespaces?: boolean;
+        rawArgumentNames?: boolean;
+        noMangle?: boolean;
+        packAlignment?: 0 | 1 | 2 | 4 | 8 | 16;
+    }
+
+    interface ParseDeclarationsReport {
+        errorCount: number;
+        ok: boolean;
     }
 
     /**
@@ -1271,12 +1431,21 @@ export namespace type {
         isUnion(): boolean;
         isEnum(): boolean;
         isTypedef(): boolean;
+        isBool(): boolean;
+        isChar(): boolean;
+        isUnsignedChar(): boolean;
+        isSigned(): boolean;
+        kind(): TypeKind;
+        name(): string;
 
         /** Size of the type in bytes. */
         size(): number;
 
         /** C-style string representation. */
         toString(): string;
+
+        /** C-style declaration with an optional declarator/member name. */
+        declaration(declaratorName?: string): string;
 
         // ── Pointer / Array ─────────────────────────────────────────────
         /** For pointer types: the pointed-to type. */
@@ -1304,9 +1473,15 @@ export namespace type {
         /** For function types: whether it is variadic. */
         isVariadicFunction(): boolean;
 
+        /** For function types: return type, named arguments, CC, and varargs flag. */
+        functionDetails(): FunctionDetails;
+
         // ── Enum introspection ──────────────────────────────────────────
         /** For enum types: all enum member entries. */
         enumMembers(): EnumMember[];
+
+        /** For enum types: width, signedness/radix metadata, and members. */
+        enumDetails(): EnumDetails;
 
         // ── Struct / Union members ──────────────────────────────────────
         /** Number of members (struct/union). */
@@ -1314,6 +1489,9 @@ export namespace type {
 
         /** All members (struct/union). */
         members(): Member[];
+
+        /** Complete struct/union layout metadata. */
+        udtDetails(): UdtDetails;
 
         /** Look up a member by name. */
         memberByName(name: string): Member;
@@ -1407,6 +1585,12 @@ export namespace type {
 
     /** Apply a named type from the local library to an address. */
     function applyNamedType(address: Address, typeName: string): void;
+
+    /** Parse and import a block of local type declarations into the current IDB. */
+    function parseDeclarations(
+        declarations: string,
+        options?: ParseDeclarationsOptions,
+    ): ParseDeclarationsReport;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1815,7 +1999,13 @@ export namespace decompiler {
 
     type VariableStorage = 'unknown' | 'register' | 'stack';
 
+    class ScopedSession {
+        valid(): boolean;
+        close(): void;
+    }
+
     interface LocalVariable {
+        index: number;
         name: string;
         typeName: string;
         isArgument: boolean;
@@ -1829,6 +2019,36 @@ export namespace decompiler {
     interface AddressMapping {
         address: Address;
         lineNumber: number;
+    }
+
+    interface CtreeItemInfo {
+        type: number;
+        address: Address;
+        isExpression: boolean;
+    }
+
+    interface ExpressionInfo {
+        type: number;
+        address: Address;
+        variableIndex: number | null;
+        helperName: string | null;
+        typeDeclaration: string | null;
+        parent: CtreeItemInfo | null;
+        parentDepth: number;
+    }
+
+    interface StatementInfo {
+        type: number;
+        address: Address;
+        parent: CtreeItemInfo | null;
+        parentDepth: number;
+    }
+
+    type VisitAction = 0 | 1 | 2 | 'continue' | 'stop' | 'skipChildren' | void;
+
+    interface LvarSnapshot {
+        empty(): boolean;
+        savedVariableCount(): number;
     }
 
     /**
@@ -1855,6 +2075,9 @@ export namespace decompiler {
         /** All local variables. */
         variables(): LocalVariable[];
 
+        /** Local variable by stable ctree variable index. */
+        variable(index: number): LocalVariable;
+
         /** Rename a local variable. */
         renameVariable(oldName: string, newName: string): void;
 
@@ -1862,6 +2085,26 @@ export namespace decompiler {
         retypeVariable(name: string, newType: string): void;
         /** Retype a variable by 0-based index. */
         retypeVariable(index: number, newType: string): void;
+
+        /** Capture saved user local-variable metadata for later restore. */
+        captureUserLvarSettings(): LvarSnapshot;
+
+        /** Restore a previously captured local-variable metadata snapshot. */
+        restoreUserLvarSettings(snapshot: LvarSnapshot): void;
+
+        /** Set a persistent local-variable comment by name. */
+        setVariableComment(name: string, comment: string): void;
+        /** Set a persistent local-variable comment by 0-based index. */
+        setVariableComment(index: number, comment: string): void;
+
+        /** Visit ctree expressions synchronously. */
+        forEachExpression(callback: (expression: ExpressionInfo) => VisitAction): number;
+
+        /** Visit ctree expressions and statements synchronously. */
+        forEachItem(
+            onExpression: (expression: ExpressionInfo) => VisitAction,
+            onStatement?: (statement: StatementInfo) => VisitAction,
+        ): number;
 
         /** The entry address of the decompiled function. */
         entryAddress(): Address;
@@ -1883,6 +2126,13 @@ export namespace decompiler {
 
     interface PseudocodeEvent {
         functionAddress: Address;
+    }
+
+    interface PopulatingPopupEvent {
+        functionAddress: Address;
+        widgetHandle: unknown;
+        popupHandle: unknown;
+        viewHandle: unknown;
     }
 
     type MicrocodeApplyResult = 'notHandled' | 'handled' | 'error' | 0 | 1 | 2;
@@ -1955,6 +2205,9 @@ export namespace decompiler {
     /** Whether the Hex-Rays decompiler is available. */
     function available(): boolean;
 
+    /** Initialize Hex-Rays and return an owned scoped session. */
+    function initialize(): ScopedSession;
+
     /** Decompile the function at the given address. */
     function decompile(address: Address): DecompiledFunction;
 
@@ -1977,6 +2230,9 @@ export namespace decompiler {
 
     /** Subscribe to pseudocode refresh events. */
     function onRefreshPseudocode(callback: (event: PseudocodeEvent) => void): Token;
+
+    /** Subscribe to Hex-Rays popup-population events. */
+    function onPopulatingPopup(callback: (event: PopulatingPopupEvent) => void): Token;
 
     /** Unsubscribe a decompiler event callback. */
     function unsubscribe(token: Token): void;
